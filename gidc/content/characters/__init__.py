@@ -6,12 +6,15 @@ from . import pyro, hydro, cryo, electro, anemo, geo, dendro
 
 CHARACTER_REGISTRY: dict[str, type[Character]] = {
     "베넷":    pyro.Bennett,
+    "슈브르즈": pyro.Chevreuse,
     "니콜":    pyro.Nicole,
+    "마비카":  pyro.Mavuika,
     "푸리나":  hydro.Furina,
     "콜롬비나": hydro.Columbina,
     "모나":    hydro.Mona,
     "에스코피에": cryo.Escoffier,
     "스커크":    cryo.Skirk,
+    "시틀라리":  cryo.Citlali,
     "이네파":  electro.Ineffa,
     "실로닌":  geo.Xilonen,
     "나비아":  geo.Navia,
