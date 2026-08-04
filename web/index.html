@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>원신 데미지 계산기 — PoC</title>
+<style>
+  :root { color-scheme: light dark; --line:#8883; --dim:#8888; --warn:#c80; --err:#c33; }
+  body { font-family: system-ui, "Malgun Gothic", sans-serif; margin:0; padding:1.5rem;
+         max-width:1400px; margin-inline:auto; line-height:1.5; }
+  h1 { font-size:1.25rem; margin:0 0 .25rem; }
+  h2 { font-size:1rem; margin:1.5rem 0 .5rem; padding-bottom:.25rem; border-bottom:1px solid var(--line); }
+  .sub { color:var(--dim); font-size:.85rem; font-weight:400; }
+  #status { padding:.6rem .8rem; border:1px solid var(--line); border-radius:6px;
+            margin-bottom:1rem; font-size:.9rem; white-space:pre-wrap; }
+  #status.err { border-color:var(--err); color:var(--err); }
+  #errors:not(:empty) { padding:.6rem .8rem; border:1px solid var(--err); color:var(--err);
+                        border-radius:6px; margin-bottom:1rem; font-size:.88rem; }
+  button { font:inherit; padding:.3rem .8rem; border:1px solid var(--line); border-radius:6px;
+           background:transparent; color:inherit; cursor:pointer; }
+  button:disabled { opacity:.4; cursor:default; }
+  button.mini { padding:.1rem .45rem; font-size:.8rem; }
+  select, input { font:inherit; padding:.2rem; background:transparent; color:inherit;
+                  border:1px solid var(--line); border-radius:4px; }
+  input[type=number] { width:5.5rem; }
+
+  table { border-collapse:collapse; width:100%; font-size:.88rem; }
+  th,td { text-align:right; padding:.3rem .5rem; border-bottom:1px solid var(--line); }
+  th:first-child, td:first-child { text-align:left; }
+  th { font-weight:600; color:var(--dim); }
+  td.num { font-variant-numeric:tabular-nums; }
+
+  .cols { display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; align-items:start; }
+  @media (max-width:1000px) { .cols { grid-template-columns:1fr; } }
+  .scroll { max-height:75vh; overflow:auto; }
+
+  /* 파티 편성 */
+  #party { display:flex; gap:.5rem; flex-wrap:wrap; align-items:stretch; margin-bottom:.5rem; }
+  #party .slot { border:1px solid var(--line); border-radius:6px; padding:.4rem .6rem;
+                 font-size:.88rem; display:flex; flex-direction:column; gap:.3rem;
+                 justify-content:center; }
+  #party .slot.on { border-color:currentColor; }
+  #party .slot .line { display:flex; gap:.35rem; align-items:center; }
+  #party .slot .sub { font-size:.78rem; }
+  #opts { display:flex; gap:1rem; align-items:center; flex-wrap:wrap; margin:.5rem 0; font-size:.88rem; }
+
+  /* 빌드 편집 창 */
+  dialog { padding:0; border:1px solid var(--line); border-radius:10px; color:inherit;
+           background:Canvas; width:min(680px, calc(100% - 2rem)); }
+  dialog::backdrop { background:#0007; }
+  .dlg-hdr { display:flex; justify-content:space-between; align-items:center; gap:1rem;
+             padding:.6rem .9rem; border-bottom:1px solid var(--line); font-weight:600; }
+  #editorbody { padding:.9rem; max-height:70vh; overflow:auto; }
+  .row { display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; margin:.5rem 0; font-size:.85rem; }
+  .row label { display:flex; gap:.3rem; align-items:center; }
+  .art { border-top:1px solid var(--line); padding-top:.4rem; margin-top:.4rem; }
+  .art .hdr { display:flex; gap:.4rem; align-items:center; font-size:.85rem; margin-bottom:.3rem; }
+  .art .hdr .name { min-width:3.2rem; color:var(--dim); }
+  .subs { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:.25rem; }
+  .subs > div { display:flex; gap:.25rem; }
+  .subs select { flex:1; min-width:0; }
+  .subs input { width:4.5rem; }
+
+  /* 히트 설명 — 데미지 행을 누르면 열린다 */
+  #damage tr.hit { cursor:pointer; }
+  #damage tr.hit:hover td { background:#8881; }
+  #damage tr.hit:focus-visible { outline:2px solid currentColor; outline-offset:-2px; }
+  dialog.wide { width:min(920px, calc(100% - 2rem)); }
+  #explainbody { padding:.9rem; max-height:75vh; overflow:auto; font-size:.85rem; }
+  .ex-res { font-size:.95rem; font-variant-numeric:tabular-nums; }
+  .ex-sec { margin-top:1.1rem; }
+  .ex-sec > h3 { font-size:.85rem; font-weight:600; color:var(--dim); margin:0 0 .4rem;
+                 padding-bottom:.2rem; border-bottom:1px solid var(--line); }
+  .ex-field { margin:.3rem 0; }
+  .ex-field .ex-field { margin-left:1.1rem; }   /* 스탯 조립의 base/pct/flat */
+  .ex-field .head, .ex-parts div { display:flex; gap:.8rem; font-variant-numeric:tabular-nums; }
+  .ex-field .head .nm, .ex-parts .src { flex:1; min-width:0; }
+  .ex-field .head .base { color:var(--dim); font-size:.8rem; }
+  .ex-parts { margin-left:1.1rem; color:var(--dim); }
+  .ex-parts .rest { color:var(--warn); }        /* 원장에 안 잡힌 나머지 */
+  .ex-sec .term { color:var(--dim); font-size:.8rem; margin-left:.45rem; }
+  .ex-kind { color:var(--dim); font-size:.85rem; }
+  /* 이 히트에 안 걸리는 항목 — 지우지 않고 접어 둔다 */
+  .ex-off { margin-top:.5rem; }
+  .ex-off > summary { cursor:pointer; color:var(--dim); font-size:.8rem; }
+  .ex-off[open] > summary { margin-bottom:.35rem; }
+  .ex-off .head { color:var(--dim); }
+
+  /* 질문 */
+  .q { padding:.5rem .6rem; border:1px solid var(--line); border-radius:6px; margin-bottom:.4rem; }
+  .q.pending { border-color:var(--warn); }
+  .q > label { display:block; font-size:.88rem; margin-bottom:.3rem; }
+  .q .badge { float:right; font-size:.72rem; color:var(--warn); margin-left:.4rem; }
+
+  /* 다중 선택 — 고른 것이 한눈에 보이도록 칩으로 편다 */
+  .q .multi { display:flex; gap:.35rem; flex-wrap:wrap; }
+  .q .chip { display:inline-flex; gap:.35rem; align-items:center; cursor:pointer;
+             padding:.2rem .6rem; font-size:.85rem;
+             border:1px solid var(--line); border-radius:999px; }
+  .q .chip:hover { border-color:var(--dim); }
+  .q .chip.on { border-color:currentColor; background:#8883; font-weight:600; }
+</style>
+</head>
+<body>
+
+<h1>원신 데미지 계산기 — Pyodide PoC</h1>
+<div class="sub" style="margin-bottom:1rem">
+  파이썬 엔진이 브라우저 안에서 그대로 돌아갑니다. 서버 없음.
+  파티원의 <b>빌드</b> 버튼으로 성유물·무기를 바꾸면 즉시 재계산되고, 질문에 답하면 새 질문이 드러납니다.
+  데미지 표의 <b>히트를 누르면</b> 그 숫자가 왜 나왔는지 — 공식과 버프별 기여 — 를 펼쳐 봅니다.
+</div>
+
+<div id="status">초기화 중…</div>
+<div id="errors"></div>
+
+<h2>파티 <span id="partycount" class="sub"></span></h2>
+<div id="party"></div>
+<div id="opts">
+  <label>데미지 대상 <select id="target"></select></label>
+  <label>적 레벨 <input id="enemylv" type="number" value="100" min="1" max="200"></label>
+  <button id="reset" disabled>답변 초기화</button>
+</div>
+
+<div class="cols">
+  <div>
+    <h2>상황 질문 <span id="qcount" class="sub"></span></h2>
+    <div id="questions" class="scroll"></div>
+  </div>
+  <div>
+    <h2>스탯 시트</h2>
+    <table id="stats"></table>
+    <h2>데미지 <span id="dmgtarget" class="sub"></span></h2>
+    <div style="max-height:55vh; overflow:auto"><table id="damage"></table></div>
+  </div>
+</div>
+
+<dialog id="editor">
+  <div class="dlg-hdr">
+    <span id="editortitle"></span>
+    <button id="editorclose">닫기</button>
+  </div>
+  <div id="editorbody"></div>
+</dialog>
+
+<dialog id="explain" class="wide">
+  <div class="dlg-hdr">
+    <span id="explaintitle"></span>
+    <button id="explainclose">닫기</button>
+  </div>
+  <div id="explainbody"></div>
+</dialog>
+
+<script src="https://cdn.jsdelivr.net/pyodide/v0.28.3/full/pyodide.js"></script>
+<!-- ?v= 는 캐시 무효화용 app.js 내용 해시. 손으로 고치지 않는다 —
+     python tools/sync_web.py 가 저장할 때마다 다시 계산해 넣는다.
+     (python -m http.server 는 Cache-Control 을 안 붙여서 브라우저가 옛 파일을 계속 쓴다) -->
+<script src="app.js?v=8127ee6a"></script>
+</body>
+</html>

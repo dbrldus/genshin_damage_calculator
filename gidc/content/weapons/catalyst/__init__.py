@@ -1,0 +1,2 @@
+from .rarity_4.favonius_codex import FavoniusCodex
+from .rarity_3.thrilling_tales_of_dragon_slayers import ThrillingTalesOfDragonSlayers

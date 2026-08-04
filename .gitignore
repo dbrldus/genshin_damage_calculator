@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# 도구 상태
+.claude/
+.omc/
+
+# macOS zip 잔해
+__MACOSX/
+.DS_Store
+._*
+
+# 에디터
+tempCodeRunnerFile.py
