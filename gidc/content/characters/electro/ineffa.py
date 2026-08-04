@@ -224,36 +224,45 @@ class Ineffa(Character):
 
     # ── 파티 버프 5: 최종 스탯을 읽어 스케일하는 버프 (방식 B) ────────────────
     def apply_dependent_buffs(self, all_hits: dict["Character", dict[str, SkillHit]]) -> None:
-        c = self.constellation
-
-        # 이네파의 최신 공격력 — 베넷 등 Phase 4의 모든 코어 스탯 기여를 반영한다.
-        atk = next(iter(all_hits[self].values())).current_atk()
-        atk_per_100 = atk / 100.0
+        # 이네파의 최신 공격력 — 값이 아니라 **읽는 함수**로 넘긴다(지연 기여).
+        # 이 몫을 받은 EM을 다시 읽어 피해로 바꾸는 캐릭터(시틀라리 A4/C1)가 있어서,
+        # 여기서 값을 미리 확정해 버리면 누가 먼저 실행되느냐가 결과를 바꾼다.
+        # 항상 같은 히트(첫 히트)를 읽으므로 언제 계산되든 값은 같다.
+        source_hit = next(iter(all_hits[self].values()))
+        atk_per_100 = lambda: source_hit.current_atk() / 100.0
 
         # Moonsign: 달감전 '기본 피해' 증가 — 파티 전원의 달감전에 적용된다.
-        base_bonus = min(atk_per_100 * self._MOONSIGN_BASE_DMG_PER_100_ATK,
-                         self._MOONSIGN_BASE_DMG_CAP)
         for char_hits in all_hits.values():
             for hit in char_hits.values():
-                hit.add("lunar_reaction_base_dmg_bonus", base_bonus, self, note="Moonsign")
+                hit.add(
+                    "lunar_reaction_base_dmg_bonus",
+                    lambda: min(atk_per_100() * self._MOONSIGN_BASE_DMG_PER_100_ATK,
+                                self._MOONSIGN_BASE_DMG_CAP),
+                    self, note="Moonsign",
+                )
 
         # C1 캐리어 재결합: 달감전으로 주는 피해 증가 — 파티 전원.
         if self._shield_active:
-            c1_bonus = min(atk_per_100 * self._C1_LUNAR_DMG_PER_100_ATK,
-                           self._C1_LUNAR_DMG_CAP)
             for char_hits in all_hits.values():
                 for hit in char_hits.values():
-                    hit.add("lunar_charged_bonus", c1_bonus, self, note="C1")
+                    hit.add(
+                        "lunar_charged_bonus",
+                        lambda: min(atk_per_100() * self._C1_LUNAR_DMG_PER_100_ATK,
+                                    self._C1_LUNAR_DMG_CAP),
+                        self, note="C1",
+                    )
 
         # A4 매개변수 재구성: 이네파 공격력의 6%를 원소 마스터리로 — 이네파 + 필드 위 1명.
         # 이네파 공격력에서 파생된 EM이므로 em_from_pct_share에 함께 태그해,
-        # 카즈하·시틀랄리 같은 EM→피해 변환이 이 지분을 재료로 쓰지 못하게 막는다.
+        # 카즈하처럼 EM을 **다시 %로 변환**하는 버프가 이 지분을 재료로 쓰지 못하게 막는다.
+        # (EM에 비례한 몫을 피해에 직접 더하는 쪽 — 시틀라리 A4/C1 — 은 재변환이 아니라
+        #  이 지분도 그대로 재료로 쓴다.)
         if self._burst_used:
-            em = atk * self._A4_EM_FROM_ATK
+            em = lambda: source_hit.current_atk() * self._A4_EM_FROM_ATK
             targets = {id(self): self}
             if self._on_field is not None:
                 targets[id(self._on_field)] = self._on_field
             for char in targets.values():
                 for hit in all_hits[char].values():
                     hit.add("elemental_mastery", em, self, note="A4 매개변수 재구성")
-                    hit.em_from_pct_share += em
+                    hit.add("em_from_pct_share", em, self, note="A4 매개변수 재구성")

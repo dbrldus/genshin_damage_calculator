@@ -291,8 +291,8 @@ class Columbina(Character):
         #        해당 히트는 build_hits에서 이미 만들고 있으므로 추가 처리가 없다.
 
         # C2 「광휘」: 인력 간섭 발동 시 자신의 HP 최대치 +40% (8초).
-        # 자기 버프이므로 Phase 3에서 넣는다 — 이후 Moonsign/C2 보름/C4가 읽는 HP에
-        # 이 증가분이 모두 반영된다.
+        # 조건 없는 자기 버프라 Phase 3에서 넣는다. 이 HP를 읽는 쪽(Moonsign/C2 보름/C4)은
+        # 지연 기여라 언제 계산되든 이 증가분을 포함한다.
         if self.constellation >= 2 and ask_bool("[콜롬비나 C2] 「광휘」 효과 보유 여부"):
             self._radiance_active = True
             for hit in hits.values():
@@ -321,22 +321,21 @@ class Columbina(Character):
         self._c6_elements = self._ask_reaction_elements() if c >= 6 else ()
 
         # ── C2 보름 분기: 콜롬비나 HP 기반으로 필드 위 캐릭터의 코어 스탯 증가 ──────
-        # 코어 풀(공격력/방어력/EM) 출력이라 이 단계가 제자리다.
-        # 읽는 값이 '자신의' HP라는 점이 안전을 보장한다 — 콜롬비나의 HP는 기본 스탯,
-        # 장비, 물 원소 공명(Phase 2), C2 광휘(Phase 3)로 이미 확정돼 있고
-        # Phase 5는 hp_pct/hp_flat이 가드 대상이라 아무도 HP를 더 못 쓴다.
-        # (다른 캐릭터가 Phase 4에서 콜롬비나의 HP를 올리는 경우가 생기면
-        #  파티원 처리 순서에 따라 값이 달라지므로 그때는 재검토가 필요하다.)
+        # 콜롬비나의 HP를 **읽는 함수**로 넘긴다(지연 기여). 같은 Phase 4에서 다른
+        # 캐릭터가 콜롬비나의 HP를 올릴 수 있어서(실로닌 C2는 물 캐릭터에게 HP +45%)
+        # 여기서 값을 확정하면 파티원 처리 순서가 결과를 바꾼다.
+        # 출력이 코어 풀(공격력/방어력/EM)이지만 지연 기여는 순서 무관이 보장되므로
+        # 정확성 가드가 봐준다 — 순환이 생기면 CyclicBuffError가 잡는다.
         if c >= 2 and self._radiance_active and self._on_field is not None:
             if moonsign_level(all_hits) is MoonsignLevel.FULL:
-                hp = next(iter(all_hits[self].values())).current_hp()
+                source_hit = next(iter(all_hits[self].values()))
                 field_name, ratio = self._C2_FULLMOON_CONVERSION[self._interference]
-                value = hp * ratio
+                value = lambda: source_hit.current_hp() * ratio
                 for hit in all_hits[self._on_field].values():
                     hit.add(field_name, value, self, note="C2 보름 전환")
                     # EM은 '다른 캐릭터 스탯의 %'로 준 지분이므로 재변환 재료가 되지 않게 태그한다.
                     if field_name == "elemental_mastery":
-                        hit.em_from_pct_share += value
+                        hit.add("em_from_pct_share", value, self, note="C2 보름 전환")
 
     def _ask_on_field_member(self, all_hits):
         """C2 보름 분기 대상이 될 현재 필드 위 캐릭터. 파티원이 1명뿐이면 묻지 않는다."""
@@ -397,21 +396,28 @@ class Columbina(Character):
     def apply_dependent_buffs(self, all_hits: dict["Character", dict[str, SkillHit]]) -> None:
         c = self.constellation
 
-        hp = next(iter(all_hits[self].values())).current_hp()
+        # 콜롬비나의 HP를 **읽는 함수**로 넘긴다(지연 기여) — 다른 캐릭터가 같은 단계에서
+        # HP를 더해 줄 수 있어 지금 확정하면 파티원 처리 순서가 결과를 바꾼다.
+        source_hit = next(iter(all_hits[self].values()))
 
         # Moonsign: 달빛 반응 '기본 피해' 증가 — 파티 전원의 달빛 반응에 적용된다.
-        base_bonus = min(hp / 1000.0 * self._MOONSIGN_BASE_DMG_PER_1000_HP,
-                         self._MOONSIGN_BASE_DMG_CAP)
         for char_hits in all_hits.values():
             for hit in char_hits.values():
-                hit.add("lunar_reaction_base_dmg_bonus", base_bonus, self, note="Moonsign")
+                hit.add(
+                    "lunar_reaction_base_dmg_bonus",
+                    lambda: min(source_hit.current_hp() / 1000.0 * self._MOONSIGN_BASE_DMG_PER_1000_HP,
+                                self._MOONSIGN_BASE_DMG_CAP),
+                    self, note="Moonsign",
+                )
 
         # C4: 이번 간섭파의 달빛 반응 피해가 콜롬비나 HP 최대치의 12.5%/2.5%/12.5%만큼 증가.
         # 피해 자체를 키우는 효과라 flat_dmg_bonus로 넣는다(코어 풀이 아니므로 Phase 5에서 안전).
         if c >= 4 and self._interference is not None:
-            flat = hp * self._C4_INTERFERENCE_HP_RATIO[self._interference]
+            ratio = self._C4_INTERFERENCE_HP_RATIO[self._interference]
             for hit in self._interference_hits(all_hits[self]):
-                hit.add("flat_dmg_bonus", flat, self, note="C4 간섭파")
+                hit.add("flat_dmg_bonus",
+                        lambda: source_hit.current_hp() * ratio,
+                        self, note="C4 간섭파")
 
     def _interference_hits(self, hits: dict[str, SkillHit]):
         """현재 선택된 인력 간섭 타입에 해당하는 히트들.

@@ -30,6 +30,9 @@ class EchoesOfAnOffering(Artifact):
         for hit in all_hits[wearer].values():
             if hit.skill_type is not SkillType.NORMAL_ATK:
                 continue
-            # 방식 B: 모든 코어 스탯 기여가 끝난 뒤 히트별 최신 ATK를 읽어
-            #         피해 풀(flat_dmg_bonus)로 차원 변환한다.
-            hit.add("flat_dmg_bonus", hit.current_atk() * 0.70, (self.artifact_set, 4))
+            # 방식 B: 히트별 최신 ATK를 읽어 피해 풀(flat_dmg_bonus)로 차원 변환한다.
+            # 값이 아니라 **읽는 함수**로 넘긴다 — 장비 패시브는 캐릭터 버프와 같은
+            # 단계에서 교차 실행되므로 지금 읽으면 뒤에 오는 공격력 버프를 놓친다.
+            hit.add("flat_dmg_bonus",
+                    lambda h=hit: h.current_atk() * 0.70,
+                    (self.artifact_set, 4))

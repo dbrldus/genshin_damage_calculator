@@ -198,13 +198,16 @@ class Xilonen(Character):
 
         # C6: 영원한 밤 축복 — 밤혼 가호 상태 일반/낙하 피해 +DEF 300%
         if c >= 6 and ask_bool("[실로닌 C6] 영원한 밤 축복 여부"):
-            # finalize() 전이므로 라이브 스탯으로 현재 방어력을 읽는다
-            def_est = next(iter(hits.values())).current_def()
+            # 여기는 Phase 3이라 파티발 방어력 기여가 아직 안 들어와 있다. 값이 아니라
+            # **읽는 함수**로 넘겨(지연 기여) 정산 시점의 완성된 방어력을 쓰게 한다.
+            source_hit = next(iter(hits.values()))
             for hit in hits.values():
                 if hit.skill_type in (SkillType.NORMAL_ATK, SkillType.PLUNGING):
-                    hit.add("flat_dmg_bonus", def_est * 3.0, self, note="C6 영원한 밤 축복")
+                    hit.add("flat_dmg_bonus",
+                            lambda: source_hit.current_def() * 3.0,
+                            self, note="C6 영원한 밤 축복")
 
-    # ── 파티 버프 5a: C2 코어 스탯(atk_pct/hp_pct) 기여 + C4 입력 수집 ─────────
+    # ── Phase 4: C2 코어 스탯(atk_pct/hp_pct) 기여 + C4 입력 수집 ──────────────
     def contribute_dependent_stats(self, all_hits: dict["Character", dict[str, SkillHit]]) -> None:
         c = self.constellation
 
@@ -221,10 +224,10 @@ class Xilonen(Character):
                             case Element.PYRO:  hit.add("atk_pct", 0.45, self, note="C2 음원 샘플")
                             case Element.HYDRO: hit.add("hp_pct",  0.45, self, note="C2 음원 샘플")
 
-        # C4 활성 여부만 수집 — 실제 flat_dmg는 5b에서 current_def()로 적용
+        # C4 활성 여부만 수집 — 실제 flat_dmg는 Phase 5에서 방어력을 읽어 적용한다
         self._c4_active = (c >= 4 and ask_bool("[실로닌 C4] 영광의 꽃 축복 여부"))
 
-    # ── 파티 버프 5a.5: 내성 감소 + C2 all_dmg_bonus/crit_dmg (코어/스케일 아님) ──
+    # ── Phase 4.5: 내성 감소 + C2 all_dmg_bonus/crit_dmg (코어/스케일 아님) ─────
     def apply_party_buffs(self, all_hits: dict["Character", dict[str, SkillHit]]) -> None:
         c = self.constellation
 
@@ -260,13 +263,17 @@ class Xilonen(Character):
                         case Element.GEO:  hit.add("all_dmg_bonus", 0.50, self, note="C2 음원 샘플")
                         case Element.CRYO: hit.add("crit_dmg",      0.60, self, note="C2 음원 샘플")
 
-    # ── 파티 버프 5b: Xilonen 최신 DEF 기반 스케일 (C4) ───────────────────────
+    # ── Phase 5: 실로닌 최신 DEF 기반 스케일 (C4) ─────────────────────────────
     def apply_dependent_buffs(self, all_hits: dict["Character", dict[str, SkillHit]]) -> None:
         # C4: 음악 단조 발동 후 파티 전원에게 영광의 꽃 축복 → 일반/강/낙하 +DEF 65%
         if not getattr(self, "_c4_active", False):
             return
-        def_val = next(iter(all_hits[self].values())).current_def()
+        # 실로닌의 최종 방어력을 값이 아니라 **읽는 함수**로 넘긴다(지연 기여) — 다른
+        # 캐릭터가 Phase 5에서 방어력을 더해 줄 수도 있어 지금 확정하면 순서에 좌우된다.
+        source_hit = next(iter(all_hits[self].values()))
         for char_hits in all_hits.values():
             for hit in char_hits.values():
                 if hit.skill_type in (SkillType.NORMAL_ATK, SkillType.CHARGED_ATK, SkillType.PLUNGING):
-                    hit.add("flat_dmg_bonus", def_val * 0.65, self, note="C4 영광의 꽃")
+                    hit.add("flat_dmg_bonus",
+                            lambda: source_hit.current_def() * 0.65,
+                            self, note="C4 영광의 꽃")

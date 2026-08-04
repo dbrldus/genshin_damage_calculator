@@ -131,13 +131,13 @@ class Nicole(Character):
 
     # ── 개인 버프 ─────────────────────────────────────────────────────────
     def apply_self_buffs(self, hits: dict[str, SkillHit]) -> None:
-        pass  # 개인 버프 없음 — Hexerei는 5b에서 파티 구성으로 판정한다
+        pass  # 개인 버프 없음 — Hexerei는 Phase 5에서 파티 구성으로 판정한다
 
-    # ── 파티 버프 5a: 자기 비움/축성의 인도 ATK 기여 + 입력 수집 ──────────────
+    # ── Phase 4: 자기 비움/축성의 인도 ATK 기여 + 입력 수집 ────────────────────
     def contribute_dependent_stats(self, all_hits: dict["Character", dict[str, SkillHit]]) -> None:
         c = self.constellation
 
-        self._consecrated: dict = {}   # char -> 축성의 인도 여부 (5b C4/C6에서 재사용)
+        self._consecrated: dict = {}   # char -> 축성의 인도 여부 (Phase 4.5/5에서 재사용)
         self._e_active = ask_bool("[니콜 E] 성언 묵시·미현의 빛 활성 여부")
         if not self._e_active:
             return
@@ -172,7 +172,7 @@ class Nicole(Character):
             self._consecrated[char] = is_consecrated
             _apply_blessing(char_hits, is_consecrated)
 
-    # ── 파티 버프 5a.5: 축성의 인도 res_reduction/def_ignore (코어/스케일 아님) ──
+    # ── Phase 4.5: 축성의 인도 res_reduction/def_ignore (코어/스케일 아님) ──────
     def apply_party_buffs(self, all_hits: dict["Character", dict[str, SkillHit]]) -> None:
         c = self.constellation
         if not self._e_active:
@@ -199,16 +199,19 @@ class Nicole(Character):
                 for hit in char_hits.values():
                     hit.add("def_ignore", 0.40, self, note="C6 축성의 인도")
 
-    # ── 파티 버프 5b: Nicole 최신 ATK 기반 스케일 (C4 + Hexerei) ────────────
+    # ── Phase 5: 니콜 최신 ATK 기반 스케일 (C4 + Hexerei) ──────────────────────
     def apply_dependent_buffs(self, all_hits: dict["Character", dict[str, SkillHit]]) -> None:
         c = self.constellation
 
-        # 니콜의 최신 ATK — 5a의 자기 축복 + 베넷 등 모든 코어 스탯 기여를 반영
-        nicole_atk = next(iter(all_hits[self].values())).current_atk()
+        # 니콜의 최신 ATK를 **읽는 함수**로 넘긴다(지연 기여) — 다른 캐릭터가 같은
+        # 단계에서 공격력을 더해 줄 수 있어 지금 확정하면 파티원 순서가 결과를 바꾼다.
+        source_hit = next(iter(all_hits[self].values()))
 
         # Hexerei: 마도·비밀 의식(마도 캐릭터 2명 이상) — 비밀 환영 피해 + Nicole ATK 300%
         if has_hexerei_rite(all_hits):
-            all_hits[self]["비밀 환영 비전 피해"].add("flat_dmg_bonus", nicole_atk * 3.0, self, note="마도·비밀 의식")
+            all_hits[self]["비밀 환영 비전 피해"].add(
+                "flat_dmg_bonus", lambda: source_hit.current_atk() * 3.0,
+                self, note="마도·비밀 의식")
 
         if not self._e_active or c < 4:
             return
@@ -218,4 +221,6 @@ class Nicole(Character):
             if not self._consecrated.get(char, False):
                 continue
             for hit in char_hits.values():
-                hit.add("flat_dmg_bonus", nicole_atk * 0.70, self, note="C4 인도자의 가호")
+                hit.add("flat_dmg_bonus",
+                        lambda: source_hit.current_atk() * 0.70,
+                        self, note="C4 인도자의 가호")

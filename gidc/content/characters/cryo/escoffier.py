@@ -251,8 +251,9 @@ class Escoffier(Character):
         if self.constellation < 2 or not self._e_active:
             return
 
-        atk  = next(iter(all_hits[self].values())).current_atk()
-        flat = atk * self._C2_COLD_DISH_DMG
+        # 에스코피에의 최종 공격력을 값이 아니라 **읽는 함수**로 넘긴다(지연 기여) —
+        # 다른 캐릭터가 Phase 5에서 공격력을 더해 줄 수도 있어 지금 확정하면 순서에 좌우된다.
+        source_hit = next(iter(all_hits[self].values()))
 
         # 「지속 시간 동안 5스택」은 히트 단가가 아니라 로테이션당 발동 횟수라
         # 단일 히트 표에는 반영하지 않는다 — _C2_COLD_DISH_STACKS는 로테이션 합산용.
@@ -261,4 +262,6 @@ class Escoffier(Character):
                 continue
             for hit in char_hits.values():
                 if hit.element is Element.CRYO:
-                    hit.add("flat_dmg_bonus", flat, self, note="C2 냉요리")
+                    hit.add("flat_dmg_bonus",
+                            lambda: source_hit.current_atk() * self._C2_COLD_DISH_DMG,
+                            self, note="C2 냉요리")

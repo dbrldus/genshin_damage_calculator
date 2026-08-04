@@ -49,9 +49,11 @@ class PeakPatrolSong(Weapon):
         if self._stacks != 2:
             return
         r = self.refinement - 1
-        est_def = next(iter(all_hits[wearer].values())).current_def()
-        party_bonus = min(
-            (est_def / 1000.0) * self._PARTY_ELEM_PER_1000[r],
+        # 착용자의 방어력을 **읽는 함수**로 넘긴다(지연 기여). 비중첩이라 최댓값 비교가
+        # 필요한데, 그 비교는 후보들의 값이 다 나온 뒤(확정 시점)에 이뤄진다.
+        source_hit = next(iter(all_hits[wearer].values()))
+        party_bonus = lambda: min(
+            (source_hit.current_def() / 1000.0) * self._PARTY_ELEM_PER_1000[r],
             self._PARTY_ELEM_CAP[r],
         )
         for char_hits in all_hits.values():

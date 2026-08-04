@@ -255,9 +255,8 @@ class Mona(Character):
         )
 
         # C2 마도 강화: 강공격 명중 시 파티 전원 원소 마스터리 +80.
-        # 고정값 코어 풀 기여라 이 단계가 제자리다 — 뒤따르는 Phase 5 스케일러들이
-        # 이 EM을 반영한 값을 읽는다. 다른 캐릭터 스탯의 %가 아니므로 em_from_pct_share
-        # 꼬리표는 달지 않는다.
+        # 고정값 코어 풀 기여라 이 단계(Phase 4)가 제자리다. 다른 캐릭터 스탯의 %가
+        # 아니므로 em_from_pct_share 꼬리표는 달지 않는다.
         if (c >= 2 and self._hexerei_rite
                 and ask_bool("[모나 C2] 강공격 명중 후 원소 마스터리 증가 유지 여부")):
             for char_hits in all_hits.values():
@@ -325,14 +324,16 @@ class Mona(Character):
         # C6 마도 강화: 성이 상태의 적 대상 모나의 강공격은 기존의 200% 피해.
         # 계수 증폭이라 코어 풀도 스탯 스케일도 아니므로 이 단계에서 처리한다.
         if c >= 6 and self._hexerei_rite:
-            all_hits[self]["강공격 피해"].coeff_amp *= self._C6_HEXEREI_CA_MULT
+            all_hits[self]["강공격 피해"].coeff_amp += self._C6_HEXEREI_CA_MULT - 1
 
     # ── 파티 버프 5: 최종 스탯을 읽어 스케일하는 버프 (방식 B) ────────────────
     def apply_dependent_buffs(self, all_hits: dict["Character", dict[str, SkillHit]]) -> None:
         # A4 「운명에 맡겨!」: 자신의 원소 충전 효율 20%만큼 물 원소 피해 보너스 증가.
         # 성유물·무기·베넷 C2 등이 모두 반영된 최종 ER을 읽어야 하므로 Phase 5에서 처리한다.
         # 출력이 hydro_dmg_bonus라 코어 풀을 건드리지 않아 정확성 가드에 걸리지 않는다.
+        # 값이 아니라 **읽는 함수**로 넘긴다(지연 기여) — 다른 캐릭터가 Phase 5에서
+        # 원소 충전 효율을 더해 줄 수도 있어 지금 확정하면 순서에 좌우된다.
         for hit in all_hits[self].values():
             hit.add("hydro_dmg_bonus",
-                    hit.energy_recharge * self._A4_ER_TO_HYDRO_DMG,
+                    lambda h=hit: h.energy_recharge * self._A4_ER_TO_HYDRO_DMG,
                     self, note="A4 운명에 맡겨!")

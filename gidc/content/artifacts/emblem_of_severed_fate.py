@@ -15,5 +15,10 @@ class EmblemOfSeveredFate(Artifact):
         pass
 
     def apply_4set_dependent(self, all_hits, wearer) -> None:
+        # 원소 충전 효율을 **읽는 함수**로 넘긴다(지연 기여) — 장비 패시브는 캐릭터
+        # 버프와 같은 단계에서 교차 실행되므로, 지금 읽으면 뒤에 오는 충전 효율 버프를
+        # 놓친다. 히트마다 값이 다를 수 있어 람다에 히트를 기본 인자로 묶는다.
         for hit in all_hits[wearer].values():
-            hit.add("burst_dmg_bonus", min(hit.energy_recharge * 0.25, 0.75), (self.artifact_set, 4))
+            hit.add("burst_dmg_bonus",
+                    lambda h=hit: min(h.energy_recharge * 0.25, 0.75),
+                    (self.artifact_set, 4))
