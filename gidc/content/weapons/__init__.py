@@ -8,7 +8,8 @@ from .sword import (
     FavoniusSword, CalamityOfEshu,
 )
 from .polearm import (
-    ProspectorsShovel, Deathmatch, FracturedHalo, SymphonistOfScents, SkywardSpine,
+    ProspectorsShovel, Deathmatch, DialoguesOfTheDesertSages,
+    FracturedHalo, SymphonistOfScents, SkywardSpine,
 )
 from .catalyst import FavoniusCodex, ThrillingTalesOfDragonSlayers
 
@@ -23,6 +24,7 @@ WEAPON_REGISTRY: dict[str, type[Weapon]] = {
     "에슈의 재앙":          CalamityOfEshu,
     "채굴의 삽":           ProspectorsShovel,
     "결투의 창":           Deathmatch,
+    "위대한 사막 현자의 대답": DialoguesOfTheDesertSages,
     "파멸의 빛고리":        FracturedHalo,
     "맛의 지휘자":          SymphonistOfScents,
     "천공의 마루":          SkywardSpine,

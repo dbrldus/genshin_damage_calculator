@@ -39,7 +39,7 @@ class AThousandBlazingSuns(Weapon):
         # 밤혼 가호 상태면 치명타 피해와 공격력 증가가 **둘 다** 75% 커진다.
         # 밤혼 가호를 못 얻는 캐릭터도 있지만 그 판정은 캐릭터 특성이 아니라 로테이션
         # 상태라 파티 구성만으로 유도할 수 없다 — 「불빛」이 켜졌을 때만 묻는다.
-        boost = (1.0 + self._NIGHTSOUL_BOOST
+        boost = ((1.0 + self._NIGHTSOUL_BOOST)
                  if ask_bool("[타오르는 천 개의 태양] 밤혼 가호 상태 여부")
                  else 1.0)
 
