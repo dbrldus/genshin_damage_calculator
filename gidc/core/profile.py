@@ -23,6 +23,30 @@ def is_recording() -> bool:
     return _RECORD_ENABLED
 
 
+# ── 지연 기여(방식 B) ────────────────────────────────────────────────────────
+# 「버퍼의 최종 스탯을 읽어서」 만드는 버프는 값을 당장 알 수 없다 — 그 버퍼의 스탯도
+# 다른 캐릭터가 아직 채우는 중일 수 있기 때문이다. 그래서 값 대신 **함수**를 등록하고,
+# 그 필드를 실제로 읽는 순간 계산한다(지연 평가). 등록 순서·파티 멤버 순서와 무관하게
+# 같은 결과가 나오고, 사슬이 몇 단이든 필요한 만큼 재귀로 풀린다.
+#
+#     hit.add("elemental_mastery", lambda: ineffa_hit.current_atk() * 0.06, self)
+#     hit.add("flat_dmg_bonus",    lambda: citlali_hit.elemental_mastery * 12, self)
+#
+# 순환(A가 B를 읽고 B가 A를 읽는 구조)은 값이 정해지지 않으므로 즉시 실패시킨다.
+# 단계를 나눠 순서로 통제하던 방식을 대신하는 안전망이다.
+#
+# _PENDING_COUNT는 「지금 이 프로세스에 미결 기여가 하나라도 있는가」를 O(1)로 알려 준다.
+# 대부분의 히트·대부분의 계산에는 지연 기여가 없으므로, 이 값이 0이면 __getattribute__가
+# 아무 일도 하지 않고 바로 빠져나간다(핫패스 비용 최소화).
+_PENDING_COUNT = 0
+# 현재 해결 중인 (히트, 필드) — 순환 탐지용. 히트를 넘나드는 순환도 잡아야 하므로 전역이다.
+_RESOLVING: dict[tuple[int, str], str] = {}
+
+
+class CyclicBuffError(RuntimeError):
+    """버프 의존이 순환해 값이 정해지지 않는다."""
+
+
 @dataclass
 class Contribution:
     """한 출처가 한 필드에 더한 가산 기여. explain_hit이 필드별로 모아 보여준다."""
@@ -237,14 +261,32 @@ class SkillHit:
     # (비중첩 버프의 출처는 위 _unique_buffs가 이미 갖고 있어 explain_hit이 병합해 읽는다.)
     _ledger: list = field(default_factory=list, init=False, repr=False, compare=False)
 
+    # ── 미결 지연 기여 ──────────────────────────────────────────────────────
+    # 필드명 → [(값을 계산하는 함수, 출처, note)]. 그 필드를 읽는 순간(또는 settle()에서)
+    # 계산되어 평범한 가산 기여로 바뀌고 여기서 사라진다. 위쪽 「지연 기여」 주석 참고.
+    _pending: dict[str, list] = field(
+        default_factory=dict, init=False, repr=False, compare=False
+    )
+    # 비중첩 지연 기여 — 필드명 → [(값을 계산하는 함수, 출처)].
+    # 확정 시점에 후보를 모두 계산한 뒤 apply_unique_buff로 넘겨 최댓값 하나만 남긴다.
+    _pending_unique: dict[str, list] = field(
+        default_factory=dict, init=False, repr=False, compare=False
+    )
+    # 지연 기여가 확정되며 값이 바뀐 필드. 정확성 가드(party.py)가 이 필드는 건너뛴다 —
+    # 지연 기여는 순서 무관이 보장되므로 코어 풀에 써도 안전하기 때문이다.
+    _lazy_written: set = field(
+        default_factory=set, init=False, repr=False, compare=False
+    )
+
     # ── 최종 스탯 (finalize() 이후 유효) ────────────────────────────────────
     hp_final:  float = field(default=0.0, init=False)
     atk_final: float = field(default=0.0, init=False)
     def_final: float = field(default=0.0, init=False)
 
     # ── 라이브 스탯 (finalize 타이밍과 무관하게 현재 누적값을 즉석 계산) ──────
-    # 버퍼 스탯 스케일 버프는 *_final 대신 이 헬퍼로 읽어, 앞선 기여(Phase 5a)를
-    # 모두 반영한 최신 스탯을 얻는다. *_final은 히트 자신의 데미지 스케일용.
+    # 방식 B 버프는 *_final 대신 이 헬퍼로 읽는다 — *_final은 Phase 6에서야 채워지는데
+    # 지연 기여는 그보다 앞선 Phase 5.5에 계산되기 때문이다. *_final은 히트 자신이
+    # 피해를 계산할 때 쓰는 값이고, 이쪽은 '지금까지 누적된 스탯'을 즉석에서 구한다.
     def current_hp(self)  -> float: return self.hp_base  * (1.0 + self.hp_pct)  + self.hp_flat
     def current_atk(self) -> float: return self.atk_base * (1.0 + self.atk_pct) + self.atk_flat
     def current_def(self) -> float: return self.def_base * (1.0 + self.def_pct) + self.def_flat
@@ -255,17 +297,124 @@ class SkillHit:
         return self.elemental_mastery - self.em_from_pct_share
 
     # ── 가산 기여 (출처 기록) ────────────────────────────────────────────────
-    def add(self, field_name: str, value: float, source: object, *, note: str = "") -> None:
+    def add(
+        self,
+        field_name: str,
+        value:      float | Callable[[], float],
+        source:     object,
+        *,
+        note: str = "",
+    ) -> None:
         """`hit.<field> += value` 와 수치적으로 동일하되, 기록이 켜져 있으면 출처를 원장에
         남긴다. 모든 가산 버프(캐릭터/세트/무기/공명)를 이 메서드로 통일하면 explain_hit이
         각 필드에 누가 얼마를 넣었는지 그대로 복원할 수 있다. 비중첩 버프는 apply_unique_buff
-        (출처를 _unique_buffs에 이미 보관)를 그대로 쓴다."""
-        setattr(self, field_name, getattr(self, field_name) + value)
+        (출처를 _unique_buffs에 이미 보관)를 그대로 쓴다.
+
+        value에 **함수**를 넘기면 지연 기여가 된다 — 값을 지금 정하지 않고, 그 필드를 읽는
+        순간 함수를 실행해 정한다. 「버퍼의 최종 스탯을 읽어서」 만드는 버프(방식 B)는 값이
+        등록 시점에 확정되지 않으므로 반드시 이쪽을 쓴다. 그러면 등록 순서·파티 멤버 순서와
+        무관하게 같은 결과가 나온다. 확정된 뒤에는 평범한 가산 기여와 완전히 같다(원장 포함).
+        """
+        if callable(value):
+            global _PENDING_COUNT
+            pending = object.__getattribute__(self, "_pending")
+            pending.setdefault(field_name, []).append((value, source, note))
+            _PENDING_COUNT += 1
+            return
+
+        # 가로채기(__getattribute__)를 우회한다 — 여기서 일반 getattr을 쓰면 지연 기여를
+        # 확정하는 도중에 같은 필드를 다시 읽어 순환으로 오인된다.
+        current = object.__getattribute__(self, field_name)
+        object.__setattr__(self, field_name, current + value)
         if _RECORD_ENABLED and value:
             self._ledger.append(Contribution(source_label(source), field_name, value, note))
 
+    # ── 지연 기여 확정 ──────────────────────────────────────────────────────
+    def _force(self, field_name: str) -> None:
+        """이 필드의 미결 지연 기여를 지금 계산해 반영한다.
+
+        계산 도중 같은 (히트, 필드)를 다시 읽으면 값이 정해질 수 없는 순환이므로 즉시
+        실패시킨다 — 단계를 나눠 순서로 통제하던 방식을 대신하는 안전망이다."""
+        global _PENDING_COUNT
+        pending  = object.__getattribute__(self, "_pending")
+        uniques  = object.__getattribute__(self, "_pending_unique")
+        entries  = pending.get(field_name)
+        u_entries = uniques.get(field_name)
+        if not entries and not u_entries:
+            return
+
+        key   = (id(self), field_name)
+        label = f"{object.__getattribute__(self, 'name')}.{field_name}"
+        if key in _RESOLVING:
+            chain = " → ".join([*_RESOLVING.values(), label])
+            raise CyclicBuffError(
+                f"버프 의존이 순환합니다: {chain}\n"
+                f"지연 기여(add에 함수 전달)는 서로의 값을 읽을 수 없습니다 — 한쪽을 "
+                f"기초 스탯(방식 A)이나 고정값으로 바꾸거나, 출력 필드를 피해 쪽"
+                f"(flat_dmg_bonus 등)으로 옮겨 고리를 끊으세요."
+            )
+
+        _RESOLVING[key] = label
+        try:
+            # 평가 도중 같은 필드에 새 지연 기여가 붙을 수도 있어 리스트가 빌 때까지 돈다.
+            while entries:
+                fn, source, note = entries[0]
+                # 평가가 끝난 **뒤에** 목록에서 뺀다 — 평가 도중 이 필드를 다시 읽으면
+                # _pending이 비어 있지 않아야 _force가 다시 불려 순환으로 잡힌다.
+                value = float(fn())
+                entries.pop(0)
+                _PENDING_COUNT -= 1
+                self.add(field_name, value, source, note=note)
+                object.__getattribute__(self, "_lazy_written").add(field_name)
+
+            # 비중첩 후보는 값을 모두 구한 뒤에 제출한다 — 최댓값 비교가 쪼개지지 않게
+            # 출처별로 합산해서 한 번씩 넘긴다(apply_unique_buff의 계약).
+            while u_entries:
+                fn, source = u_entries[0]
+                value = float(fn())
+                u_entries.pop(0)
+                _PENDING_COUNT -= 1
+                self.apply_unique_buff(source, field_name, value)
+                object.__getattribute__(self, "_lazy_written").add(field_name)
+        finally:
+            del _RESOLVING[key]
+            if not entries:
+                pending.pop(field_name, None)
+            if not u_entries:
+                uniques.pop(field_name, None)
+
+    def settle(self) -> None:
+        """남아 있는 미결 지연 기여를 전부 확정한다.
+
+        읽히지 않은 필드(피해 보너스 등)에도 지연 기여가 있을 수 있으므로, 스탯 확정
+        (finalize) 직전에 파티가 한 번 호출해 준다."""
+        pending = object.__getattribute__(self, "_pending")
+        uniques = object.__getattribute__(self, "_pending_unique")
+        while pending or uniques:
+            self._force(next(iter(pending or uniques)))
+
+    # ── 읽기 가로채기 ───────────────────────────────────────────────────────
+    # 미결 지연 기여가 있는 필드를 읽으면 그 자리에서 확정한다. 이것이 「단계」를 대신한다 —
+    # 값이 필요해진 순간 계산되므로 누가 먼저 실행됐는지가 결과를 바꾸지 않는다.
+    #
+    # 지연 기여가 하나도 없으면(_PENDING_COUNT == 0) 전역 하나만 보고 즉시 빠져나간다.
+    # 내부 필드(_로 시작)는 지연 대상이 아니므로 검사에서 제외해 재귀를 막는다.
+    def __getattribute__(self, name: str):
+        if _PENDING_COUNT and name[0] != "_":
+            d = object.__getattribute__(self, "__dict__")
+            pending = d.get("_pending")
+            uniques = d.get("_pending_unique")
+            if (pending and name in pending) or (uniques and name in uniques):
+                object.__getattribute__(self, "_force")(name)
+        return object.__getattribute__(self, name)
+
     # ── 비중첩 버프 (동명 소스는 중첩되지 않음) ─────────────────────────────
-    def apply_unique_buff(self, source: object, field_name: str, value: float) -> None:
+    def apply_unique_buff(
+        self,
+        source:     object,
+        field_name: str,
+        value:      float | Callable[[], float],
+    ) -> None:
         """동명의 소스가 만드는 버프를 누산한다 — 필드별로 **최댓값 하나만** 남는다.
 
         같은 성유물 세트/무기를 여러 명이 착용해도 파티 전체 버프는 중첩되지 않는 게임
@@ -281,12 +430,26 @@ class SkillHit:
         무기는 무기 클래스 등. 한 필드에 같은 source로 여러 번 나눠 제출하면 최댓값
         비교가 쪼개지므로, 조건부 증가분까지 합산한 **최종 값을 한 번에** 제출한다.
         내성 감소처럼 음수로 표현되는 효과도 지원한다(같은 키에 부호를 섞지는 말 것).
+
+        value에 **함수**를 넘기면 지연 기여가 된다(add와 동일). 최댓값 비교는 값이 있어야
+        하므로, 후보들을 모아 두었다가 그 필드를 읽는 순간 전부 계산한 뒤 비교한다 —
+        스탯에서 파생되는 비중첩 버프(바위산을 맴도는 노래의 파티 원소 피해)가 이쪽이다.
         """
+        if callable(value):
+            global _PENDING_COUNT
+            uniques = object.__getattribute__(self, "_pending_unique")
+            uniques.setdefault(field_name, []).append((value, source))
+            _PENDING_COUNT += 1
+            return
+
         slot = (source, field_name)
         prev = self._unique_buffs.get(slot, 0.0)
         if abs(value) <= abs(prev):
             return
-        setattr(self, field_name, getattr(self, field_name) + (value - prev))
+        # add()와 같은 이유로 가로채기를 우회한다 — 차액을 누산할 뿐이라 미결 지연 기여를
+        # 여기서 확정할 이유가 없다(그쪽은 자기 시점에 따로 더해진다).
+        current = object.__getattribute__(self, field_name)
+        object.__setattr__(self, field_name, current + (value - prev))
         self._unique_buffs[slot] = value
 
     def buff_value(self, source: object, field_name: str) -> float:
@@ -300,8 +463,7 @@ class SkillHit:
         self.def_final = self.current_def()
 
     def finalize_damage_multipliers(self) -> None:
-        # Phase 7: 의존 버프(Phase 5)가 flat/pct 풀에 추가한 값을 *_final에
-        # 반영하기 위해 코어 스탯을 다시 확정한다. (현재 Phase 4와 동일 연산)
+        # Phase 6: 모든 기여(Phase 2~5.5)가 끝난 뒤 코어 스탯을 단 한 번 확정한다.
         self.finalize_core_stats()
 
 
@@ -318,9 +480,12 @@ def add_all_elemental_dmg_bonus(hit: SkillHit, value: float, source: object = "(
         hit.add(name, value, source)
 
 
-def add_all_elemental_dmg_bonus_unique(hit: SkillHit, source: object, value: float) -> None:
+def add_all_elemental_dmg_bonus_unique(
+    hit: SkillHit, source: object, value: float | Callable[[], float]
+) -> None:
     """7원소 피해 보너스를 비중첩으로 증가시킨다 (물리 제외).
-    동명의 소스가 여러 번 제출해도 원소별로 최댓값 하나만 남는다 — SkillHit.apply_unique_buff 참고."""
+    동명의 소스가 여러 번 제출해도 원소별로 최댓값 하나만 남는다 — SkillHit.apply_unique_buff 참고.
+    value에 함수를 넘기면 지연 기여가 된다(스탯에서 파생되는 비중첩 버프)."""
     for name in _ALL_ELEMENTAL_DMG_FIELDS:
         hit.apply_unique_buff(source, name, value)
 

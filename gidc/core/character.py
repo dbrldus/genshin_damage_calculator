@@ -227,18 +227,26 @@ class Character(ABC):
         ...
 
     def contribute_dependent_stats(self, all_hits: dict["Character", dict[str, SkillHit]]) -> None:
-        """코어 스탯 풀(atk/def/hp/em)에**만** 기여하는 크로스 버프 + 유저 입력 수집.
-        apply_dependent_buffs보다 먼저 실행되어 그쪽이 완성된 스탯을 읽게 한다.
-        재사용할 상태는 self에 저장. 기본값: no-op.
-        EM %-공유(설탕/나히다)는 elemental_mastery와 em_from_pct_share에 동시에 태그하여
-        무한 루프(재변환)를 막는다."""
+        """Phase 4 — 코어 스탯 풀(atk/def/hp/em)에**만** 기여하는 크로스 버프 + 유저 입력 수집.
+
+        여기 넣는 값은 **고정값이어야 한다.** 남의 최종 스탯을 읽어 만드는 값이라면
+        지연 기여로(`add`에 함수 전달) 넘겨야 같은 단계의 다른 기여를 놓치지 않는다
+        — 콜롬비나 C2가 자기 HP를 읽는데 실로닌 C2가 같은 단계에서 그 HP를 올리는 식의
+        얽힘이 실제로 있다.
+
+        유저 입력(ask_*)은 이 단계에 모은다 — 질문 ID가 (호출 지점, 반복 횟수)라 실행
+        시점이 밀리면 질문 집합이 흔들린다. 재사용할 상태는 self에 저장. 기본값: no-op.
+
+        EM %-공유(설탕/나히다)는 elemental_mastery와 em_from_pct_share에 동시에 태그해
+        「EM을 다시 %로 변환하는」 버프가 그 지분을 재료로 쓰지 못하게 막는다."""
         pass
 
     def apply_party_buffs(self, all_hits: dict["Character", dict[str, SkillHit]]) -> None:
-        """코어 풀도 최종 스탯 스케일도 아닌 크로스 버프(res_reduction, 고정 all_dmg_bonus,
-        crit_rate/crit_dmg, def_ignore 등) + 유저 입력 수집. 스탯을 읽지 않으므로 순서 무관.
-        contribute_dependent_stats에서 저장해둔 상태가 있으면 재사용해 입력을 중복으로
-        묻지 않는다. 기본값: no-op."""
+        """Phase 4.5 — 코어 풀도 최종 스탯 스케일도 아닌 크로스 버프(res_reduction,
+        고정 all_dmg_bonus, crit_rate/crit_dmg, def_ignore 등).
+
+        스탯을 읽지 않으므로 순서 무관이다. contribute_dependent_stats(Phase 4)에서
+        저장해둔 상태를 재사용해 같은 입력을 두 번 묻지 않는다. 기본값: no-op."""
         pass
 
     @abstractmethod
@@ -246,8 +254,19 @@ class Character(ABC):
         """버퍼의 **최종 스탯을 읽어서** 스케일하는 크로스 버프만 넣는다 — 읽지 않는 버프는
         apply_party_buffs로. 방식 A(atk_base 등 기초 스탯)는 그대로 읽고, 방식 B(최종 스탯,
         신학/한운/실로닌)는 current_atk/def/hp()를 flat_dmg_bonus로 차원 변환해 적용한다.
-        ATK/DEF/HP 코어 풀에 되먹이면 무한 루프이며 정확성 가드가 실패시킨다.
-        EM→피해 변환(카즈하/시틀랄리)은 elemental_mastery 대신 convertible_em()을 읽는다."""
+
+        **값이 아니라 함수를 넘긴다.** 이 단계에서 읽는 스탯은 다른 캐릭터가 같은 단계에서
+        더하는 중일 수 있으므로, 지금 계산해 버리면 파티 멤버 순서가 결과를 바꾼다.
+        `hit.add(field, lambda: 버퍼히트.current_atk() * 2.4, self)`처럼 넘기면 그 필드를
+        읽는 순간(늦어도 Phase 5.5 정산에서) 계산되어 순서와 무관해진다. 사슬이 몇 단이든
+        필요한 만큼 재귀로 풀리고, 순환이면 CyclicBuffError로 즉시 실패한다.
+        (람다가 루프 변수를 잡으면 `lambda h=hit: ...`로 묶을 것 — 늦은 바인딩 주의.)
+
+        ATK/DEF/HP 코어 풀에 **즉시 값으로** 되먹이면 무한 루프이며 정확성 가드가 실패시킨다.
+        EM을 **다시 %로 변환**하는 버프(EM→EM, EM→피해 보너스 %; 카즈하)는 elemental_mastery
+        대신 convertible_em()을 읽어 꼬리표 달린 지분을 재료에서 뺀다. 반대로 EM에 비례한
+        몫을 피해에 직접 더하는 버프(시틀라리 A4/C1)는 재변환이 아니므로 elemental_mastery를
+        그대로 읽는다 — 실제로 들고 있는 EM은 출처와 무관하게 전부 재료가 된다."""
         ...
 
     # ── 스탯 빌드 ─────────────────────────────────────────────────────────
@@ -345,7 +364,8 @@ class Character(ABC):
         self.apply_party_buffs(all_hits)             # 코어/스케일 아닌 크로스 버프
         self.apply_dependent_buffs(all_hits)         # 스탯 스케일 읽기 (current_* 라이브 조회)
         self.apply_dependent_equipment(all_hits)     # 무기/세트 스케일 패시브
-        for hit in all_hits[self].values():          # 확정은 마지막에 한 번
+        for hit in all_hits[self].values():          # 남은 지연 기여 정산 → 확정
+            hit.settle()
             hit.finalize_damage_multipliers()
         return all_hits[self]
 

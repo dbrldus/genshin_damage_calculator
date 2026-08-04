@@ -1,3 +1,27 @@
+"""파티 단위 계산 파이프라인.
+
+계산 순서의 **단일 출처**다. 캐릭터·무기·성유물 주석이 「Phase 4」처럼 부르는 이름이
+여기서 정의된다.
+
+    Phase 0   특성 레벨 보정      파티 구성만 보고 결정 (스커크 「무예 전수」).
+                                  계수 표를 고르는 값이라 히트 생성보다 먼저 확정한다.
+    Phase 1   히트 생성           build_hits() — 계수/원소/스킬 종류만. 스탯은 기본값.
+    Phase 2   파티 편성 버프      원소 공명, 환상극 버프. 스탯을 읽지 않는 가산뿐.
+    Phase 3   개인 버프           기초/장비 스탯 → 세트·무기 기여 패시브 → apply_self_buffs.
+    Phase 4   코어 스탯 기여      contribute_dependent_stats — 크로스 캐릭터 ATK/DEF/HP/EM.
+                                  유저 입력(ask_*)도 여기서 한 번에 모은다.
+    Phase 4.5 그 밖의 크로스 버프  apply_party_buffs — 내성 감소, 고정 피해 보너스, 치명타 등.
+    Phase 5   스탯 스케일 버프     apply_dependent_buffs + 장비의 *_dependent 패시브.
+                                  「버퍼의 최종 스탯을 읽어」 만드는 버프(방식 B).
+    Phase 5.5 정산               남은 지연 기여를 전부 값으로 확정한다.
+    Phase 6   최종 확정           base/pct/flat → *_final. 게임과 동일하게 단 한 번.
+
+**단계는 「누가 먼저 실행되는가」가 아니라 「무엇을 출력하는가」로 나뉜다.**
+Phase 2~4.5의 기여는 전부 가산(혹은 최댓값)이라 실행 순서와 무관하고, 순서에 좌우될
+수밖에 없는 것 — 남의 최종 스탯을 읽어 만드는 값 — 은 Phase 5에서 **함수로 등록**되어
+읽는 순간(늦어도 Phase 5.5)에 계산된다. 그래서 파티 멤버 순서가 결과를 바꾸지 않는다.
+자세한 규약은 SkillHit.add(gidc/core/profile.py)와 Character의 각 훅 docstring 참고.
+"""
 from collections import Counter
 import math
 
@@ -17,10 +41,6 @@ class Party:
 
     def build_profiles(self) -> dict[Character, dict[str, SkillHit]]:
         # ── Phase 0 : 파티 구성만으로 정해지는 특성 레벨 보정 ────────────────────
-        # 계수 자체가 바뀌므로 히트를 만들기 전에 확정해야 한다. 유저 입력도 스탯도
-        # 읽지 않아(원소 구성만 봄) 멤버 순서와 무관하다.
-        # 현재 출처는 원소전투 스킬(무예 전수)뿐이다 — 평타/폭발 상승 효과가 생기면
-        # PartyState에 판정을 추가하고 여기서 같은 방식으로 대입한다.
         skill_bonus = skill_level_bonus(self.members)
         for char in self.members:
             char.na_level_bonus    = 0
@@ -30,44 +50,45 @@ class Party:
         # Phase 1 : 히트 서술자 생성 (스탯은 기본값)
         self.all_hits = {char: char.build_hits() for char in self.members}
 
-        # Phase 2 : 원소 공명 (원소 종류만 참조 — 스탯 읽기 없음, 선행 적용)
+        # Phase 2 : 원소 공명 & 환상극 버프
         _apply_elemental_resonance(self.all_hits, self.members)
-
-        # ── Phase 2.5 (개인 버프) : 환상 축복 등 파티 편성만으로 결정되는 캐릭터 개인 버프 ──
-        # 원소 공명과 마찬가지로 스탯을 읽지 않고 코어 풀에 가산만 하므로 Phase 3 이전에 둔다.
         _apply_fantastical_blessing(self.all_hits, self.members)
 
         # Phase 3 : 전체 캐릭터 주 버프 (base + raw + 세트/무기 패시브 + 자신 버프)
         for char in self.members:
             char.apply_primary_buffs(self.all_hits)
 
-        # ── Phase 4 (스탯 기여) : 크로스 캐릭터 코어 스탯 버프 + 유저 입력 수집 ──
-        # 가산 연산뿐이라 멤버 순서 무관. 스케일 읽기(다음 단계)가 볼 스탯을 먼저 완성한다.
-        # 스탯 확정(finalize)은 스케일 읽기가 current_*()로 라이브 조회하므로 여기서 불필요.
-        # 무한 루프 방지 규칙상 스케일러는 스탯을 되먹이지 않으니(방식 A/B), 단일 패스로 충분하다.
+        # ── Phase 4 : 크로스 캐릭터 코어 스탯(ATK/DEF/HP/EM) 기여 + 유저 입력 수집 ──
+        # 가산뿐이라 멤버 순서 무관. 뒤 단계가 읽을 스탯을 여기서 완성한다.
+        # ask_*는 반드시 이 단계에 모은다 — 질문 ID가 (호출 지점, 반복 횟수)라
+        # 실행 시점이 밀리면 질문 집합이 흔들린다(지연 기여 함수 안에서 묻지 말 것).
         for char in self.members:
             char.contribute_dependent_stats(self.all_hits)
 
-        # ── Phase 4.5 (파티 버프) : 코어 풀도, 최종 스탯 스케일도 아닌 크로스 버프 ──
-        # res_reduction, 고정값 all_dmg_bonus, crit 계열 등. 스탯을 읽지 않으므로
-        # 순서 무관하며, Phase 5(스케일 읽기)보다 먼저 끝내 두 단계를 명확히 분리한다.
+        # ── Phase 4.5 : 코어 풀도 스탯 스케일도 아닌 크로스 버프 ──────────────────
+        # 내성 감소, 고정값 all_dmg_bonus, 치명타 계열 등. 스탯을 읽지 않아 순서 무관.
         for char in self.members:
             char.apply_party_buffs(self.all_hits)
 
-        # ── Phase 5 (스탯 스케일 공유) : 버퍼의 current_* 스탯을 읽어 피해 풀에 적용 ──
-        #    Phase 4가 모두 끝난 뒤라 멤버 순서와 무관하게 결정적 결과를 낸다.
+        # ── Phase 5 : 「버퍼의 최종 스탯을 읽어」 만드는 버프 (방식 B) ─────────────
+        # 여기서 등록되는 것은 값이 아니라 **함수**다. 실제 계산은 그 필드를 읽는
+        # 순간(늦어도 Phase 5.5)에 일어나므로, 아래 루프의 멤버 순서는 결과와 무관하다.
         core_snapshot = _snapshot_core_pools(self.all_hits)
         for char in self.members:
             char.apply_dependent_buffs(self.all_hits)      # 캐릭터 스케일 버프
             char.apply_dependent_equipment(self.all_hits)  # 무기/성유물 스케일 패시브
-        # 파티 공통 스케일 버프 — 특정 캐릭터 킷이 아니라 파티 구성으로 정해지는 방식 B 버프.
-        # 캐릭터 스케일 버프가 모두 끝난 뒤라 버퍼의 최신 스탯(current_*)을 읽는다.
+        # 파티 구성으로 정해지는 방식 B 버프 — 특정 캐릭터 킷이 아니라서 여기 따로 있다.
         _apply_full_moon_lunar_bonus(self.all_hits, self.members)
-        # 정확성 가드: 스케일러는 ATK/DEF/HP 코어 풀을 출력하지 않는다(방식 A는 base, 방식 B는
-        # Flat DMG로 차원 변환). 건드렸다면 무한 루프를 유발하는 잘못된 모델이므로, 코어 스탯
-        # 기여라면 contribute_dependent_stats로, 스탯을 읽지 않는 고정 버프라면
-        # apply_party_buffs로 옮기거나 방식 B(flat_dmg_bonus)로 바꿔야 한다.
+        # 정확성 가드 — 이 단계에서 코어 풀을 **즉시 값으로** 바꾸지 않았는지 본다.
+        # (지연 기여로 바뀐 몫은 순서 무관이 보장되므로 봐준다. _assert_core_pools_unchanged 참고.)
         _assert_core_pools_unchanged(self.all_hits, core_snapshot)
+
+        # ── Phase 5.5 (정산) : 남은 지연 기여를 전부 값으로 확정한다 ───────────────
+        # 지연 기여는 그 필드를 읽는 순간 계산되지만, 피해 보너스처럼 여기까지 아무도
+        # 읽지 않는 필드도 있다. 모든 등록이 끝난 지금 훑어야 어느 것도 놓치지 않는다.
+        for char_hits in self.all_hits.values():
+            for hit in char_hits.values():
+                hit.settle()
 
         # ── Phase 6 (최종 확정) : 누적된 base/pct/flat을 *_final에 한 번 반영 ──
         #    게임과 동일하게 확정은 마지막에 단 한 번 (다회차 재확정 없음).
@@ -90,11 +111,20 @@ _CORE_POOL_FIELDS = (
 )
 
 
+def _read_core_pools(hit: SkillHit) -> tuple:
+    """가드 전용 raw 읽기 — 지연 기여를 **확정시키지 않는다**.
+
+    평범한 getattr은 미결 지연 기여가 있으면 그 자리에서 확정해 버린다(SkillHit의 읽기
+    가로채기). 가드는 감시자일 뿐 소비자가 아니므로, 값을 보러 왔다가 확정 시점을
+    Phase 5.5보다 앞당기면 안 된다 — 그러면 아직 등록되지 않은 기여를 놓친 채 굳는다."""
+    return tuple(object.__getattribute__(hit, f) for f in _CORE_POOL_FIELDS)
+
+
 def _snapshot_core_pools(all_hits: dict[Character, dict[str, SkillHit]]) -> dict[int, tuple]:
     snap: dict[int, tuple] = {}
     for char_hits in all_hits.values():
         for hit in char_hits.values():
-            snap[id(hit)] = tuple(getattr(hit, f) for f in _CORE_POOL_FIELDS)
+            snap[id(hit)] = _read_core_pools(hit)
     return snap
 
 
@@ -107,16 +137,23 @@ def _assert_core_pools_unchanged(
             before = snapshot.get(id(hit))
             if before is None:
                 continue
-            after = tuple(getattr(hit, f) for f in _CORE_POOL_FIELDS)
+            after = _read_core_pools(hit)
             if before != after:
-                changed = [f for f, b, a in zip(_CORE_POOL_FIELDS, before, after) if b != a]
+                # 지연 기여로 바뀐 필드는 봐준다 — 값이 등록 순서가 아니라 읽는 시점에
+                # 정해지므로 파티 멤버 순서와 무관하고, 순환은 CyclicBuffError가 잡는다.
+                # 여기서 막아야 하는 것은 순서에 좌우되는 **즉시** 가산뿐이다.
+                lazy = hit._lazy_written
+                changed = [f for f, b, a in zip(_CORE_POOL_FIELDS, before, after)
+                           if b != a and f not in lazy]
+                if not changed:
+                    continue
                 raise AssertionError(
                     f"[정확성 가드] apply_dependent_buffs(스케일 단계)가 ATK/DEF/HP 코어 풀을 "
-                    f"변경했습니다: {char.__class__.__name__} / '{hit.name}' → {changed}. "
-                    f"무한 루프 방지 규칙상 스케일러는 코어 스탯을 출력하지 않는다. 코어 스탯 "
+                    f"**즉시 값으로** 변경했습니다: {char.__class__.__name__} / '{hit.name}' "
+                    f"→ {changed}. 이 단계의 즉시 가산은 파티 멤버 순서에 좌우된다. 코어 스탯 "
                     f"기여라면 contribute_dependent_stats로, 스탯을 읽지 않는 고정 버프라면 "
                     f"apply_party_buffs로 옮기고, 최종 스탯 기반이라면 방식 B"
-                    f"(flat_dmg_bonus로 차원 변환)를 사용하세요."
+                    f"(flat_dmg_bonus로 차원 변환)나 지연 기여(add에 함수 전달)를 사용하세요."
                 )
 
 
@@ -168,12 +205,7 @@ def _apply_elemental_resonance(
 
 
 # ── 환상 축복 (기간 한정 이벤트) : 지정 캐릭터를 파티에 편성하면 HP/공격력/방어력 +20% ───
-# 대상 명단이 이벤트마다 바뀌므로(현재는 야란·아이노·플린스·올로룬·스커크·레일라) 하드코딩
-# 하지 않고, 파티원 중 현재 활성 명단에 해당하는 인원을 유저가 다중 선택으로 고른다.
-# 캐릭터 개인 버프(그 캐릭터 자신의 스탯만 증가)이며 스탯을 읽지 않고 코어 풀에 가산만
-# 하므로 원소 공명과 동급으로 Phase 2.5에서 처리한다.
 _ILLUSORY_BLESSING_PCT = 0.20
-
 
 def _apply_fantastical_blessing(
     all_hits: dict[Character, dict[str, SkillHit]],
@@ -194,15 +226,6 @@ def _apply_fantastical_blessing(
 
 
 # ── 달빛 징조·보름 (2명 편성) : 비-달빛징조 버퍼의 스탯 스케일 달빛 반응 피해 증가 ──────
-# 달빛 징조가 아닌 캐릭터가 원소전투 스킬/폭발 발동 후 20초 동안, 자신의 원소 타입 기반으로
-# 주변 파티 전원의 달빛 반응 피해를 최대 36%까지 증가시킨다(중첩 불가). 우가/폭발 가동은
-# 상시 유지되는 것으로 보고(다른 Moonsign 상시 효과와 동일하게) 파티 구성에서 유도한다.
-#
-# 「중첩 불가」 → 동시에 활성인 버퍼가 여러 명이면 값이 가장 큰 한 명만 남는다(활성 버퍼 중
-# max). 다만 각 버퍼가 실제로 활성인지(원소 스킬/폭발 발동 여부)는 로테이션마다 다르므로
-# (예: 실로닌 E 생략 시 실로닌은 비활성), 각 버퍼의 실효 %를 라벨에 보여주고 현재 활성인
-# 버퍼를 유저가 고른다 — 활성 버퍼 중 가장 높은 것을 고르면 max가 된다. 활성 버퍼가 없으면
-# 「없음」을 고른다. 반응별로 세 필드(달감전/달개화/달결정)에 동일하게 들어간다.
 _FULL_MOON_LUNAR_CAP    = 0.36
 _FULL_MOON_LUNAR_FIELDS = ("lunar_charged_bonus", "lunar_bloom_bonus", "lunar_crystallize_bonus")
 
