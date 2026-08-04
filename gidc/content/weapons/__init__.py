@@ -2,7 +2,7 @@ from gidc.enums import WeaponType
 from gidc.core.weapon import Weapon, WeaponSubStat
 
 from ._default import DefaultWeapon
-from .claymore import Verdict
+from .claymore import AThousandBlazingSuns, Verdict
 from .sword import (
     PeakPatrolSong, SkywardBlade, AquilaFavonia, Azurelight,
     FavoniusSword, CalamityOfEshu,
@@ -13,6 +13,7 @@ from .polearm import (
 from .catalyst import FavoniusCodex, ThrillingTalesOfDragonSlayers
 
 WEAPON_REGISTRY: dict[str, type[Weapon]] = {
+    "타오르는 천 개의 태양": AThousandBlazingSuns,
     "판정":               Verdict,
     "바위산을 맴도는 노래": PeakPatrolSong,
     "천공의 검":           SkywardBlade,
