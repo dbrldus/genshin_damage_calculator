@@ -9,10 +9,10 @@ JS 쪽은 .toJs() 한 번으로 끝난다.
 
 빌드시트 스키마 (party 원소 하나 = 캐릭터 하나):
 
-    { "character": "스커크", "level": 90, "constellation": 0,
+    { "character": "스커크", "level": 90, "ascension": 6, "constellation": 0,
       "naLevel": 1, "skillLevel": 10, "burstLevel": 8,
       "traits": ["HEXEREI"],
-      "weapon": { "name": "에슈의 재앙", "refinement": 5 },
+      "weapon": { "name": "에슈의 재앙", "refinement": 5, "level": 90, "ascension": 6 },
       "artifacts": {
         "flower": { "set": "FINALE_OF_THE_DEEP_GALLERIES",
                     "main": { "stat": "HP", "value": 4780 },
@@ -32,7 +32,12 @@ JS 쪽은 .toJs() 한 번으로 끝난다.
 """
 from __future__ import annotations
 
+import json
+from datetime import datetime, timezone
+
 from gidc.core.artifact import _INVALID_SUB_STATS, _VALID_MAIN_STATS, MainStat, SubStat
+from gidc.core import weapon_scaling
+from gidc.core.ascension import MAX_LEVEL, phases_for_level, resolve_phase
 from gidc.core.damage import calculate
 from gidc.core.enemy import Enemy
 from gidc.core.explain import (
@@ -78,6 +83,15 @@ def get_registries() -> dict:
             for slot, stats in _VALID_MAIN_STATS.items()
         },
         "validSubStats": sorted(s.name for s in StatType if s not in _INVALID_SUB_STATS),
+        # 레벨 → 고를 수 있는 돌파 단계. 상한 레벨(20/40/50/60/70/80)만 둘이고
+        # 나머지는 하나다. 규칙을 JS가 베껴 쓰지 않도록 표를 통째로 넘긴다.
+        "ascensionPhases": {
+            str(lv): list(phases_for_level(lv)) for lv in range(1, MAX_LEVEL + 1)
+        },
+        "maxLevel":     MAX_LEVEL,
+        # 무기 레벨 규칙은 성급으로 갈린다(1·2성만 Lv.70/4돌파에서 끝난다). 그래서
+        # 캐릭터처럼 표 하나가 아니라 성급별로 나눠 넘긴다.
+        "weaponLevels": _weapon_levels(),
         "reactions":    [r.name for r in ReactionType],
         "dmgTypes":     [d.name for d in DmgType],
         "traits":       [{"id": t.name, "label": t.value} for t in CharacterTrait],
@@ -103,11 +117,32 @@ def _characters() -> list[dict]:
 
 
 def _weapons() -> list[dict]:
-    """무기 종류는 인스턴스 속성이라 정련 1로 한 번 만들어 읽는다(패시브는 돌지 않는다)."""
+    """무기 종류는 인스턴스 속성이라 정련 1로 한 번 만들어 읽는다(패시브는 돌지 않는다).
+
+    baseAtk는 만렙 기준이고 **고를 때 알아보라고 보여주는 값**이라 게임 화면처럼
+    반올림한다 — 계산에 쓰이는 것은 표에서 나온 소수(541.83…)다."""
     out = []
     for name, cls in sorted(WEAPON_REGISTRY.items()):
         w = cls(1)
-        out.append({"name": name, "type": w.weapon_type.name, "baseAtk": w.base_atk})
+        out.append({"name": name, "type": w.weapon_type.name,
+                    "rarity": w.rarity, "baseAtk": round(w.base_atk)})
+    return out
+
+
+def _weapon_levels() -> dict:
+    """성급 → {최대 레벨, 레벨별 고를 수 있는 돌파 단계}.
+
+    무기도 캐릭터와 같이 상한 레벨(20/40/50/60/70/80)에서 돌파 전/후 두 상태가 모두
+    유효하고 기본 공격력이 다르다. 다른 점은 1·2성이 Lv.70 4돌파에서 끝난다는 것뿐이라
+    표를 성급으로 한 겹 더 나눈다. 규칙을 JS가 베껴 쓰지 않도록 표를 통째로 넘긴다."""
+    out = {}
+    for rarity in weapon_scaling.rarities():
+        top = weapon_scaling.max_level(rarity)
+        out[str(rarity)] = {
+            "maxLevel": top,
+            "phases": {str(lv): list(weapon_scaling.phases_for_level(rarity, lv))
+                       for lv in range(1, top + 1)},
+        }
     return out
 
 
@@ -142,6 +177,7 @@ def char_to_spec(char) -> dict:
     return {
         "character":     char.name,
         "level":         char.level,
+        "ascension":     char.ascension,
         "constellation": char.constellation,
         "naLevel":       char.na_level,
         "skillLevel":    char.skill_level,
@@ -150,6 +186,8 @@ def char_to_spec(char) -> dict:
         "weapon": None if w is None else {
             "name":       weapon_names.get(type(w), ""),
             "refinement": w.refinement,
+            "level":      w.level,
+            "ascension":  w.ascension,
         },
         "artifacts": {
             key: _artifact_to_spec(getattr(char, key)) for key in SLOT_KEYS
@@ -184,6 +222,11 @@ def char_from_spec(spec: dict):
 
     char = make_character(name=spec["character"])
     char.level         = int(spec.get("level", 90))
+    # 돌파 단계는 상한 레벨에서만 두 갈래라 레벨만으로는 정해지지 않는다. 값이 없으면
+    # 그 레벨의 기본값(돌파한 쪽)을 쓰고, 짝이 안 맞으면 ValueError로 올라간다.
+    # 이 필드가 없던 시절의 빌드 JSON도 그대로 읽힌다 — Lv.90이면 예전과 같은 6돌파다.
+    asc = spec.get("ascension")
+    char.ascension     = resolve_phase(char.level, None if asc is None else int(asc))
     char.constellation = int(spec.get("constellation", 0))
     char.na_level      = int(spec.get("naLevel", 1))
     char.skill_level   = int(spec.get("skillLevel", 1))
@@ -194,7 +237,16 @@ def char_from_spec(spec: dict):
 
     w = spec.get("weapon")
     if w and w.get("name"):
-        char.weapon = make_weapon(name=w["name"], refinement=int(w.get("refinement", 1)))
+        weapon = make_weapon(name=w["name"], refinement=int(w.get("refinement", 1)))
+        # 무기 레벨·돌파도 캐릭터와 같은 규칙이다. 값이 없으면 만렙 그대로 둔다 —
+        # 이 필드가 없던 시절의 빌드 JSON이 예전과 똑같이 읽힌다.
+        if w.get("level") is not None:
+            weapon.level = int(w["level"])
+        phase = w.get("ascension")
+        weapon.ascension = weapon_scaling.resolve_phase(
+            weapon.rarity, weapon.level, None if phase is None else int(phase)
+        )
+        char.weapon = weapon
 
     for key, art in (spec.get("artifacts") or {}).items():
         if art:
@@ -210,6 +262,110 @@ def _artifact_from_spec(slot_key: str, spec: dict):
         sub_stats    = [SubStat(StatType[s["stat"]], float(s["value"]))
                         for s in spec.get("subs") or []],
     )
+
+
+# ══════════════════════════════════════════════════════════════════════════
+#  빌드 JSON 주고받기 (캐릭터 한 명분)
+# ══════════════════════════════════════════════════════════════════════════
+# 공유 형식은 위 빌드시트 스키마에 봉투만 씌운 것이다 — 내보내기 전용 스키마를 따로
+# 만들면 캐릭터에 필드가 늘 때마다 조용히 어긋난다. 봉투가 하는 일은 둘뿐이다.
+# 남의 JSON인지 구분하고(format), 나중에 스키마가 바뀌었을 때 알아채는 것(version).
+#
+#     { "format": "gidc.build", "version": 1, "scope": "character",
+#       "exportedAt": "2026-08-05T12:34:56+00:00",
+#       "build": { "character": "스커크", ... } }        ← char_to_spec 그대로
+#
+# 파티 전체가 아니라 한 명분인 이유: 상황 질문 답변(answers)은 질문 ID가
+# (호출 지점, 같은 지점 반복 횟수)라 파티 구성과 엔진 소스 줄 번호에 묶여 있어
+# 밖으로 들고 나갈 수 없다. 빌드만 오간다.
+BUILD_FORMAT  = "gidc.build"
+BUILD_VERSION = 1
+
+
+def export_build(spec) -> str:
+    """캐릭터 한 명의 빌드시트를 공유용 JSON 문자열로.
+
+    내보내기 전에 Character로 한 번 조립했다가 다시 편다(왕복). 그러면 엔진의 검증이
+    그대로 걸리고 화면이 들고 있던 군더더기가 떨어져 나가, **내보낸 JSON은 반드시 다시
+    읽힌다**. 빌드가 잘못돼 있으면 ValueError가 그대로 올라간다(UI가 보여준다)."""
+    return json.dumps(
+        {
+            "format":     BUILD_FORMAT,
+            "version":    BUILD_VERSION,
+            "scope":      "character",
+            "exportedAt": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+            "build":      char_to_spec(char_from_spec(_to_py(spec))),
+        },
+        ensure_ascii=False, indent=2,
+    )
+
+
+def import_build(text: str) -> dict:
+    """공유 JSON을 빌드시트 한 명분으로. 실패해도 예외 대신 errors를 채워 돌려준다.
+
+    받아 주는 것 — 손으로 만든 JSON도 웬만하면 읽히게 한다:
+      · export_build가 만든 봉투     {"format": …, "build": {…}}
+      · 파티 형식                    {"party": [{…}, …]}     → 첫 명만 (나머지는 warning)
+      · 빌드시트 하나만 그대로       {"character": "스커크", …}
+
+    돌려주는 build는 export_build와 같은 왕복을 거친 값이라, 받은 쪽에서 곧바로
+    party 슬롯에 꽂아도 계산이 된다."""
+    warnings: list[str] = []
+
+    try:
+        data = json.loads(text)
+    except (TypeError, ValueError) as e:
+        return _import_failed(f"JSON을 읽지 못했습니다: {e}")
+    if not isinstance(data, dict):
+        return _import_failed("빌드 JSON은 객체({ … })여야 합니다.")
+
+    fmt = data.get("format")
+    if fmt is not None and fmt != BUILD_FORMAT:
+        return _import_failed(f"이 계산기의 빌드 JSON이 아닙니다 (format={fmt!r}).")
+
+    version = data.get("version", BUILD_VERSION)
+    if isinstance(version, int) and version > BUILD_VERSION:
+        return _import_failed(
+            f"더 새로운 형식(v{version})의 빌드 JSON입니다 — "
+            f"이 계산기는 v{BUILD_VERSION}까지 읽습니다."
+        )
+
+    spec = data.get("build")
+    if spec is None:
+        party = data.get("party")
+        if isinstance(party, list) and party:
+            spec = party[0]
+            if len(party) > 1:
+                first = spec.get("character", "첫 번째") if isinstance(spec, dict) else "첫 번째"
+                warnings.append(
+                    f"파티 {len(party)}명이 들어 있어 {first} 한 명만 가져왔습니다."
+                )
+        elif "character" in data:
+            spec = data
+    if not isinstance(spec, dict):
+        return _import_failed("빌드 내용을 찾지 못했습니다 (build / party / character 없음).")
+
+    try:
+        build = char_to_spec(char_from_spec(spec))
+    except (ValueError, KeyError, TypeError) as e:
+        return _import_failed(_import_error(e), warnings)
+
+    return {"build": build, "errors": [], "warnings": warnings}
+
+
+def _import_failed(message: str, warnings: list[str] | None = None) -> dict:
+    return {"build": None, "errors": [message], "warnings": warnings or []}
+
+
+def _import_error(e: Exception) -> str:
+    """엔진 예외를 붙여넣은 사람이 고칠 수 있는 문장으로. KeyError는 str()이
+    따옴표 친 이름 하나뿐이라 그대로 보여주면 무슨 말인지 알 수 없다."""
+    if isinstance(e, KeyError):
+        return (f"알 수 없는 이름입니다: {e.args[0]!r} — 캐릭터·무기·성유물 세트·"
+                f"스탯 이름을 확인하세요 (표시 라벨이 아니라 영문 코드로 적습니다).")
+    if isinstance(e, TypeError):
+        return f"값의 형태가 맞지 않습니다: {e}"
+    return str(e)
 
 
 def _members_from_sheet(sheet: dict) -> tuple[list, list[dict]]:
@@ -256,13 +412,12 @@ def run_calculation(sheet, answers=None) -> dict:
     enemy    = Enemy(level=int((sheet.get("enemy") or {}).get("level", 90)))
     reaction = ReactionType[settings.get("reaction", "NONE")]
     dmg_type = DmgType[settings["dmgType"]] if settings.get("dmgType") else None
-    char_lv  = int(settings.get("charLevel", 90))
     targets  = set(settings.get("targets") or [])
 
     return {
         "stats":   _stats(all_hits),
-        "damage":  _damage(all_hits, enemy, reaction, dmg_type, char_lv, targets),
-        "explain": _explain(all_hits, enemy, reaction, dmg_type, char_lv,
+        "damage":  _damage(all_hits, enemy, reaction, dmg_type, targets),
+        "explain": _explain(all_hits, enemy, reaction, dmg_type,
                             targets, settings.get("explain")),
         "questions": [q.to_dict() for q in source.asked],
         "pending":   [q.id for q in source.pending],
@@ -297,7 +452,10 @@ def _stats(all_hits) -> list[dict]:
     return out
 
 
-def _damage(all_hits, enemy, reaction, dmg_type, char_lv, targets) -> list[dict]:
+# 방어력 배율과 반응 레벨 배율은 **때리는 캐릭터 자신의 레벨**로 정해진다. 파티에
+# 레벨이 섞여 있으면(Lv.80 시틀라리 + Lv.90 딜러) 한 값으로 뭉뚱그릴 수 없고, Lv.80을
+# 90으로 계산하면 방어력 배율이 0.4865 대신 0.5가 되어 피해가 2.78% 부풀려진다.
+def _damage(all_hits, enemy, reaction, dmg_type, targets) -> list[dict]:
     out = []
     for char, hits in all_hits.items():
         if targets and char.name not in targets:
@@ -305,7 +463,7 @@ def _damage(all_hits, enemy, reaction, dmg_type, char_lv, targets) -> list[dict]
         for hit in hits.values():
             ctx = build_damage_context(
                 hit, enemy,
-                reaction_type=reaction, dmg_type=dmg_type, char_level=char_lv,
+                reaction_type=reaction, dmg_type=dmg_type, char_level=char.level,
             )
             r = calculate(ctx)
             out.append({
@@ -364,7 +522,7 @@ _FORMULA_HIDDEN = {"combined_mult"}
 _STAT_FIELDS = {f"{pre}_{tag}" for _, pre in _STAT_TRIPLES for tag in _STAT_PARTS}
 
 
-def _explain(all_hits, enemy, reaction, dmg_type, char_lv, targets, hit_name) -> dict | None:
+def _explain(all_hits, enemy, reaction, dmg_type, targets, hit_name) -> dict | None:
     """버프 귀속. Explain은 이미 구조화돼 있어 그대로 편다 (to_text()는 쓰지 않는다).
 
     화면 구성(스탯 조립 / 보너스 풀 / 치명타·반응 / 공식)까지 여기서 짜 준다.
@@ -379,7 +537,7 @@ def _explain(all_hits, enemy, reaction, dmg_type, char_lv, targets, hit_name) ->
         if hit is None:
             continue
         ex = explain_hit(hit, enemy=enemy, reaction_type=reaction,
-                         dmg_type=dmg_type, char_level=char_lv)
+                         dmg_type=dmg_type, char_level=char.level)
         # 이 히트가 실제로 읽는 필드. 나머지는 값이 붙어 있어도 이 숫자와 무관하다
         # — 화면은 그것을 접어 둔다.
         applied = damage_input_fields(hit, reaction_type=reaction, dmg_type=dmg_type)

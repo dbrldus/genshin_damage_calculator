@@ -46,7 +46,10 @@ function sheet(extra = {}) {
   return {
     party,
     enemy: { level: enemyLevel },
-    settings: { reaction: "NONE", charLevel: 90, targets: target ? [target] : [], ...extra },
+    // 캐릭터 레벨은 여기서 보내지 않는다 — 방어력/반응 레벨 배율은 때리는 캐릭터
+    // 자신의 레벨로 정해지므로 엔진이 party[i].level 을 직접 읽는다. 하나로 뭉치면
+    // 레벨이 섞인 파티에서 틀리고, Lv.80 을 90 으로 계산하면 피해가 2.78% 부풀려진다.
+    settings: { reaction: "NONE", targets: target ? [target] : [], ...extra },
   };
 }
 
@@ -156,7 +159,21 @@ function renderParty() {
 
 function slotSummary(c) {
   const arts = Object.values(c.artifacts || {}).filter(Boolean).length;
-  return `Lv${c.level} C${c.constellation} · ${c.weapon ? c.weapon.name : "무기 없음"} · 성유물 ${arts}/5`;
+  // 상한 레벨은 같은 Lv 표기로 두 상태가 존재하므로 돌파를 함께 적는다 —
+  // 파티 카드만 보고 Lv80 5돌파와 Lv80 6돌파를 구분할 수 있어야 한다.
+  const forked = (reg.ascensionPhases[c.level] || []).length > 1;
+  const lv = `Lv${c.level}` + (forked ? `·${c.ascension}돌파` : "");
+  return `${lv} C${c.constellation} · ${weaponSummary(c.weapon)} · 성유물 ${arts}/5`;
+}
+
+// 무기는 만렙이 기본이라 그때는 레벨을 적지 않는다 — 늘 붙어 있으면 눈에 안 들어와서,
+// 정작 만렙이 아닌 무기를 끼웠을 때 알아채지 못한다.
+function weaponSummary(w) {
+  if (!w) return "무기 없음";
+  const rule = weaponRule(w.name);
+  if (w.level == null || w.level === rule.maxLevel) return w.name;
+  const forked = (rule.phases[w.level] || []).length > 1;
+  return `${w.name} Lv${w.level}` + (forked ? `·${w.ascension}돌파` : "");
 }
 
 // 캐릭터를 바꾸면 그 캐릭터의 프리셋이 있으면 그것으로, 없으면 무기를 비운다
@@ -192,15 +209,86 @@ function renderEditor() {
   body.append(buildEditor(c));
 }
 
+// 레벨이 바뀌면 돌파 단계를 다시 맞춘다. 지금 값이 새 레벨에서도 유효하면 건드리지 않고
+// (Lv.80/6돌파 → Lv.85 는 그대로 6), 아니면 그 레벨의 기본값 = 돌파한 쪽으로 옮긴다.
+// 가능한 단계 목록은 엔진이 준 표(reg.ascensionPhases)만 읽는다 — 규칙을 여기 베껴 두면
+// 조용히 어긋난다. 표에 없는 레벨(범위 밖)은 그대로 두고 엔진이 오류로 잡게 한다.
+function phaseFor(level, current) {
+  const phases = reg.ascensionPhases[level];
+  if (!phases || !phases.length) return current;
+  return phases.includes(current) ? current : phases[phases.length - 1];
+}
+
+// 무기 쪽도 같은 일을 하되 표를 성급으로 한 번 더 고른다 — 1·2성만 Lv.70/4돌파에서
+// 끝나기 때문이다. 무기를 안 골랐을 때도 입력을 그려야 해서 5성 표를 기본으로 준다.
+function weaponRule(name) {
+  const meta = name && reg.weapons.find((w) => w.name === name);
+  return reg.weaponLevels[meta ? meta.rarity : 5];
+}
+
+// 무기의 (레벨, 돌파) 짝을 그 무기의 성급에서 유효한 값으로 맞춘다. 레벨을 바꿨을 때도,
+// 상한이 다른 무기로 갈아 끼웠을 때도 같은 함수를 지난다 — 규칙이 한 곳에만 있게.
+function weaponLevelFor(w) {
+  const rule = weaponRule(w.name);
+  // 레벨이 아직 없으면(무기를 막 골랐을 때) 만렙에서 시작하고, 있으면 1~상한으로 자른다.
+  // 0이나 빈 칸을 만렙으로 되돌리지 않는 것이 중요하다 — 지우고 다시 치는 중에 값이
+  // 90으로 튀면 무엇을 입력했는지 알 수 없다.
+  const raw = Number(w.level);
+  const level = w.level == null || Number.isNaN(raw)
+    ? rule.maxLevel
+    : Math.min(Math.max(Math.round(raw), 1), rule.maxLevel);
+  const phases = rule.phases[level];
+  return {
+    ...w,
+    level,
+    ascension: phases.includes(w.ascension) ? w.ascension : phases[phases.length - 1],
+  };
+}
+
 function buildEditor(c) {
   const meta = reg.characters.find((x) => x.name === c.character) || {};
   c.artifacts = c.artifacts || {};
   const d = make("div");
 
-  // 레벨 / 명함 / 특성 레벨
+  // 빌드 JSON 주고받기
+  const share = make("div", { className: "art-share" },
+    make("span", { className: "name", textContent: "빌드 JSON" }));
+  for (const [mode, label, title] of [
+    ["export", "내보내기", "이 빌드를 JSON으로 복사한다"],
+    ["import", "가져오기", "JSON을 붙여넣어 이 슬롯을 교체한다"],
+  ]) {
+    const b = make("button", { className: "mini", textContent: label, title });
+    b.onclick = () => openShare(mode);
+    share.append(b);
+  }
+  d.append(share);
+
+  // 레벨 / 돌파 / 명함 / 특성 레벨
   const row = make("div", { className: "row" });
+
+  const lv = make("input", { type: "number", value: c.level, min: 1, max: reg.maxLevel });
+  lv.style.width = "4rem";
+  lv.onchange = () => {
+    c.level     = Number(lv.value);
+    c.ascension = phaseFor(c.level, c.ascension);
+    structuralChange(true);        // 레벨이 바뀌면 돌파 선택지 자체가 달라진다
+  };
+  row.append(make("label", { textContent: "레벨" }, lv));
+
+  // 돌파 — 상한 레벨(20/40/50/60/70/80)에서만 두 갈래다. Lv.80/80(미돌파)과
+  // Lv.80/90(돌파 완료)은 기초 스탯도 어센션 보너스도 다른 캐릭터라 물어봐야 한다.
+  // 나머지 레벨은 단계가 하나뿐이라 잠가 둔다 — 값을 숨기지는 않는다(왜 이 스탯인지 보인다).
+  const phases = reg.ascensionPhases[c.level] || [c.ascension];
+  const asel = opt(phases, c.ascension, (p) => p, (p) => `${p}돌파`);
+  asel.disabled = phases.length < 2;
+  asel.title = phases.length < 2
+    ? "이 레벨에서는 돌파 단계가 하나로 정해집니다"
+    : "같은 레벨에 돌파 전/후 두 상태가 있습니다";
+  asel.onchange = () => { c.ascension = Number(asel.value); structuralChange(); };
+  row.append(make("label", { textContent: "돌파" }, asel));
+
   for (const [key, label, min, max] of [
-    ["level", "레벨", 1, 90], ["constellation", "명함", 0, 6],
+    ["constellation", "명함", 0, 6],
     ["naLevel", "평타", 1, 10], ["skillLevel", "E", 1, 10], ["burstLevel", "Q", 1, 10],
   ]) {
     const inp = make("input", { type: "number", value: c[key], min, max });
@@ -234,8 +322,13 @@ function buildEditor(c) {
   for (const w of usable) wsel.add(new Option(`${w.name} (기초 ${w.baseAtk})`, w.name));
   wsel.value = c.weapon ? c.weapon.name : "";
   wsel.onchange = () => {
-    c.weapon = wsel.value ? { name: wsel.value, refinement: c.weapon?.refinement || 1 } : null;
-    structuralChange(true);   // 정련 셀렉트의 활성 여부가 바뀐다
+    c.weapon = wsel.value
+      ? weaponLevelFor({ name: wsel.value, refinement: c.weapon?.refinement || 1,
+                         // 무기를 바꾸면 성급이 바뀌어 레벨 상한도 달라진다. 들고 있던
+                         // 레벨을 그대로 물려주되 새 상한에 맞춰 자른다.
+                         level: c.weapon?.level, ascension: c.weapon?.ascension })
+      : null;
+    structuralChange(true);   // 레벨/돌파/정련 입력의 활성 여부와 선택지가 바뀐다
   };
   const rsel = opt([1, 2, 3, 4, 5], c.weapon ? c.weapon.refinement : 1,
                    (x) => x, (x) => "정련 " + x);
@@ -243,6 +336,38 @@ function buildEditor(c) {
   rsel.onchange = () => { if (c.weapon) { c.weapon.refinement = Number(rsel.value); structuralChange(); } };
   wrow.append(make("label", { textContent: "무기" }, wsel), rsel);
   d.append(wrow);
+
+  // 무기 레벨 / 돌파 — 캐릭터 레벨과 같은 규칙이고, 상한만 성급으로 갈린다
+  // (1·2성은 Lv.70/4돌파에서 끝난다). 무기가 없으면 잠가 두되 숨기지는 않는다.
+  const wrule = weaponRule(c.weapon && c.weapon.name);
+  const wlrow = make("div", { className: "row" });
+
+  const wlv = make("input", {
+    type: "number", value: c.weapon ? c.weapon.level : "", min: 1, max: wrule.maxLevel,
+  });
+  wlv.style.width = "4rem";
+  wlv.disabled = !c.weapon;
+  wlv.onchange = () => {
+    if (!c.weapon) return;
+    c.weapon.level = Number(wlv.value);
+    Object.assign(c.weapon, weaponLevelFor(c.weapon));
+    structuralChange(true);        // 레벨이 바뀌면 돌파 선택지 자체가 달라진다
+  };
+  wlrow.append(make("label", { textContent: "무기 레벨" }, wlv));
+
+  const wphases = c.weapon ? wrule.phases[c.weapon.level] || [c.weapon.ascension] : [];
+  const wasel = opt(wphases, c.weapon ? c.weapon.ascension : "", (p) => p, (p) => `${p}돌파`);
+  wasel.disabled = !c.weapon || wphases.length < 2;
+  wasel.title = !c.weapon
+    ? "무기를 먼저 고르세요"
+    : wphases.length < 2
+      ? "이 레벨에서는 돌파 단계가 하나로 정해집니다"
+      : "같은 레벨에 돌파 전/후 두 상태가 있습니다 — 기본 공격력이 다릅니다";
+  wasel.onchange = () => {
+    if (c.weapon) { c.weapon.ascension = Number(wasel.value); structuralChange(); }
+  };
+  wlrow.append(make("label", { textContent: "무기 돌파" }, wasel));
+  d.append(wlrow);
 
   // 성유물 5슬롯
   for (const slot of reg.slots) d.append(artifactEditor(c, slot));
@@ -307,6 +432,76 @@ function blankArtifact(slot) {
 }
 
 const statLabel = (id) => (reg.statTypes.find((s) => s.id === id) || {}).label || id;
+
+// ── 빌드 JSON 주고받기 ───────────────────────────────────────────────────
+// 캐릭터 한 명분만 오간다. 파티 전체가 아닌 이유는 web_api.py 의 BUILD_FORMAT 주석 —
+// 상황 질문 답변은 질문 ID가 파티 구성과 엔진 소스 줄 번호에 묶여 있어 들고 나갈 수 없다.
+//
+// 형식 검사·정규화는 전부 파이썬이 한다(export_build/import_build). 여기서 JSON을
+// 직접 뜯으면 캐릭터에 필드가 늘 때마다 조용히 어긋난다.
+//
+// 열려 있는 빌드 편집 창(editing)의 슬롯을 대상으로 한다 — 그 창에서만 열리는 창이다.
+function openShare(mode) {
+  if (editing === null) return;
+  const c = party[editing];
+  const ta = $("sharetext");
+  const isExport = mode === "export";
+
+  shareMsg("");
+  $("sharetitle").textContent = isExport ? `${c.character} 빌드 내보내기` : "빌드 가져오기";
+  $("sharehint").textContent = isExport
+    ? "이 JSON을 그대로 넘기면 다른 브라우저에서도 같은 빌드가 됩니다."
+    : "받은 빌드 JSON을 붙여넣고 [적용]을 누르세요. 이 슬롯이 통째로 교체됩니다 (캐릭터가 달라도 됩니다).";
+  $("sharecopy").hidden = !isExport;
+  $("shareapply").hidden = isExport;
+  ta.readOnly = isExport;
+  ta.value = "";
+
+  if (isExport) {
+    try {
+      ta.value = api.export_build(c);
+    } catch (e) {
+      shareMsg("내보내지 못했습니다 — 빌드가 유효하지 않습니다.\n" +
+               (e && e.message ? e.message : String(e)), "err");
+    }
+  }
+
+  $("share").showModal();
+  ta.focus();
+  if (isExport && ta.value) ta.select();
+}
+
+function shareMsg(text, cls = "") {
+  const m = $("sharemsg");
+  m.textContent = text;
+  m.className = cls;
+}
+
+// 오류면 창을 열어 둔 채 이유를 보여준다 — 붙여넣은 JSON이 남아 있어야 고칠 수 있다.
+// 경고(파티 JSON에서 한 명만 가져옴 등)는 적용은 하되 창을 닫지 않고 무엇이 빠졌는지 알린다.
+function applyShare() {
+  if (editing === null) return;
+  let out;
+  try {
+    out = unwrap(api.import_build($("sharetext").value));
+  } catch (e) {
+    shareMsg("가져오기 실패:\n" + (e && e.message ? e.message : String(e)), "err");
+    return;
+  }
+  if (out.errors.length) {
+    shareMsg(out.errors.join("\n"), "err");
+    return;
+  }
+
+  party[editing] = out.build;
+  structuralChange(true);          // 캐릭터·무기가 바뀌면 위젯 구성 자체가 달라진다
+
+  if (out.warnings.length) {
+    shareMsg(`${out.build.character} 빌드를 적용했습니다.\n` + out.warnings.join("\n"), "ok");
+  } else {
+    $("share").close();
+  }
+}
 
 // ── 답변 수렴 루프의 한 스텝 ─────────────────────────────────────────────
 // pending 이 남아 있어도 stats/damage 는 채워져 온다(미답은 중립 기본값).
@@ -560,6 +755,21 @@ function fieldBlock(fb) {
   if (parts.childElementCount) d.append(parts);
   return d;
 }
+
+$("shareclose").onclick = () => $("share").close();
+$("shareapply").onclick = () => applyShare();
+$("sharecopy").onclick = async () => {
+  const ta = $("sharetext");
+  ta.select();
+  // 클립보드 API는 보안 컨텍스트(https / localhost)에서만 열린다. file:// 로 연 경우
+  // 조용히 아무 일도 안 일어나는 대신 선택해 둔 채로 Ctrl+C 를 안내한다.
+  try {
+    await navigator.clipboard.writeText(ta.value);
+    shareMsg("복사했습니다.", "ok");
+  } catch {
+    shareMsg("클립보드를 쓸 수 없습니다 — 선택된 내용을 Ctrl+C 로 복사하세요.", "err");
+  }
+};
 
 $("explainclose").onclick = () => $("explain").close();
 $("editorclose").onclick = () => closeEditor();

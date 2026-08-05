@@ -20,7 +20,7 @@
            background:transparent; color:inherit; cursor:pointer; }
   button:disabled { opacity:.4; cursor:default; }
   button.mini { padding:.1rem .45rem; font-size:.8rem; }
-  select, input { font:inherit; padding:.2rem; background:transparent; color:inherit;
+  select, input, textarea { font:inherit; padding:.2rem; background:transparent; color:inherit;
                   border:1px solid var(--line); border-radius:4px; }
   input[type=number] { width:5.5rem; }
 
@@ -60,6 +60,19 @@
   .subs > div { display:flex; gap:.25rem; }
   .subs select { flex:1; min-width:0; }
   .subs input { width:4.5rem; }
+
+  /* 빌드 JSON 주고받기 — 빌드 편집 창 위에 겹쳐 뜬다 */
+  .art-share { display:flex; gap:.4rem; align-items:center; margin:.5rem 0 .2rem; font-size:.85rem; }
+  .art-share .name { flex:1; color:var(--dim); }
+  #sharebody { padding:.9rem; display:flex; flex-direction:column; gap:.6rem; }
+  #sharehint { font-size:.82rem; }
+  #sharetext { width:100%; box-sizing:border-box; height:18rem; max-height:50vh; resize:vertical;
+               font-family:ui-monospace, Consolas, "D2Coding", monospace; font-size:.78rem;
+               line-height:1.4; white-space:pre; overflow:auto; }
+  #sharemsg:not(:empty) { font-size:.85rem; white-space:pre-wrap; }
+  #sharemsg.err { color:var(--err); }
+  #sharemsg.ok  { color:var(--dim); }
+  #sharebtns { display:flex; gap:.5rem; justify-content:flex-end; }
 
   /* 히트 설명 — 데미지 행을 누르면 열린다 */
   #damage tr.hit { cursor:pointer; }
@@ -142,6 +155,22 @@
   <div id="editorbody"></div>
 </dialog>
 
+<dialog id="share">
+  <div class="dlg-hdr">
+    <span id="sharetitle"></span>
+    <button id="shareclose">닫기</button>
+  </div>
+  <div id="sharebody">
+    <div id="sharehint" class="sub"></div>
+    <textarea id="sharetext" spellcheck="false" autocomplete="off"></textarea>
+    <div id="sharemsg"></div>
+    <div id="sharebtns">
+      <button id="sharecopy">복사</button>
+      <button id="shareapply">적용</button>
+    </div>
+  </div>
+</dialog>
+
 <dialog id="explain" class="wide">
   <div class="dlg-hdr">
     <span id="explaintitle"></span>
@@ -154,6 +183,6 @@
 <!-- ?v= 는 캐시 무효화용 app.js 내용 해시. 손으로 고치지 않는다 —
      python tools/sync_web.py 가 저장할 때마다 다시 계산해 넣는다.
      (python -m http.server 는 Cache-Control 을 안 붙여서 브라우저가 옛 파일을 계속 쓴다) -->
-<script src="app.js?v=8127ee6a"></script>
+<script src="app.js?v=616449f8"></script>
 </body>
 </html>
