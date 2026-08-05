@@ -25,7 +25,13 @@ def iter_sources():
     for p in sorted(PKG.rglob("*")):
         if not p.is_file():
             continue
-        if SKIP_DIRS & set(p.relative_to(ROOT).parts):
+        parts = p.relative_to(ROOT).parts
+        if SKIP_DIRS & set(parts):
+            continue
+        # 점으로 시작하는 것은 소스가 아니라 도구가 흘린 것이다(.omc/, .DS_Store …).
+        # gidc/ 안에는 점으로 시작하는 정상 파일이 없으므로 통째로 걷어 낸다 —
+        # 한 번 섞이면 배포 번들에 조용히 실려 나간다.
+        if any(part.startswith(".") for part in parts):
             continue
         if p.suffix in SKIP_SUFFIX:
             continue
