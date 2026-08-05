@@ -13,12 +13,13 @@ class SongOfDaysPast(Artifact):
     여러 장착 캐릭터가 생성한 회복량을 기록할 수 있다. 장착 캐릭터가 대기 상태일 때도 해당 효과는 발동된다
     """
 
-    def apply_2set(self, profiles, wearer) -> None:
-        for hit in profiles[wearer].values():
-            hit.healing_bonus += 0.15
+    def apply_2set(self, all_hits, wearer) -> None:
+        for hit in all_hits[wearer].values():
+            hit.add("healing_bonus", 0.15, (self.artifact_set, 2))
 
-    def apply_4set(self, profiles, wearer) -> None:
+    def apply_4set(self, all_hits, wearer) -> None:
         if ask_bool("[지난날의 노래 4세트] '그리운 회상' 버프 활성?"):
             recorded = ask_int("[지난날의 노래 4세트] 기록된 치유량 (pt)", 0, 15000)
-            for hit in profiles[wearer].values():
-                hit.flat_dmg_bonus += recorded * 0.08
+            for hit in all_hits[wearer].values():
+                hit.add("flat_dmg_bonus", recorded * 0.08, (self.artifact_set, 4),
+                        note="그때의 파도")

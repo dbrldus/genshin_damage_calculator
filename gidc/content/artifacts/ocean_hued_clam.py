@@ -14,7 +14,7 @@ class OceanHuedClam(Artifact):
 
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
-            hit.healing_bonus += 0.15
+            hit.add("healing_bonus", 0.15, (self.artifact_set, 2))
 
     def apply_4set(self, all_hits, wearer) -> None:
         pass
