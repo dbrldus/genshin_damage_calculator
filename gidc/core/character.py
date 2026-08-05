@@ -89,7 +89,10 @@ class Character(ABC):
         self.name:          str = self.name or self.__class__.__name__
         self.stat_key:      str = self.stat_key or self.__class__.__name__
         self.level:         int = 90
-        # 돌파 단계 0~6. 아직 level과 연결돼 있지 않다 — 기본값은 Lv.90의 6돌파다.
+        # 돌파 단계 0~6. level과 따로 두는 이유는 상한 레벨(20/40/…/80)에서 두 상태가
+        # 모두 유효하기 때문이다 — Lv.20/20 과 Lv.20/40 은 다른 캐릭터다.
+        # level을 바꿀 때 짝을 맞추려면 ascension.resolve_phase(level, phase)를 쓴다.
+        # 기본값은 Lv.90의 6돌파.
         self.ascension:     int = ascension.MAX_PHASE
         self.constellation: int = 0
         self.na_level:      int = 1
