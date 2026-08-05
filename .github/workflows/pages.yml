@@ -1,0 +1,55 @@
+# web/ 을 GitHub Pages 로 배포한다.
+#
+# 배포되는 것은 web/ 세 파일뿐이다 — index.html, app.js, engine.zip.
+# 나머지(gidc/, tools/, bench.py)는 engine.zip 안으로 들어가거나 배포에서 빠진다.
+#
+# 굽는 단계를 여기서 한 번 더 도는 이유: web/engine.zip 은 커밋된 바이너리라
+# tools/sync_web.py 를 돌리는 것을 잊으면 gidc/ 와 조용히 어긋난다. 배포 때마다
+# 소스에서 다시 구우면 **배포된 엔진은 항상 그 커밋의 gidc/ 와 같다**.
+# (build_web.py 는 순수 stdlib 라 설치할 의존성이 없다.)
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:        # Actions 탭에서 손으로도 돌릴 수 있게
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 배포가 겹치면 나중 것만 살린다. 앞선 배포를 중간에 끊지는 않는다.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 엔진 번들 재생성
+        run: python tools/build_web.py
+
+      # enablement 를 켜 두면 저장소에 Pages 가 아직 꺼져 있어도 이 워크플로가
+      # 켜면서 소스를 「GitHub Actions」로 잡는다. 없으면 첫 실행이 「Pages 미설정」
+      # 으로 실패하고, 설정을 손으로 바꾼 뒤 다시 돌려야 한다.
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
