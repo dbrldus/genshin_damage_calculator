@@ -18,7 +18,7 @@
   4) 없음
 선택: [스커크 A4] 죽음의 강 스택 수 (0~3): [에스코피에 E] 저온 조리법 가동 여부 (y/n): [에스코피에 Q] 현란한 칼솜씨 발동 여부 (y/n): [모나 Q] 「성이」 효과 활성 여부 (y/n): [푸리나 Q] 성대한 카니발 사용 여부 (y/n): 
 [스커크 스탯 시트]
-  최종 공격력      :    3,046.3
+  최종 공격력      :    3,047.2
   최종 HP          :   23,443.3
   최종 방어력      :    1,115.7
   치명타 확률      :      83.1%
@@ -26,7 +26,7 @@
   원소 충전 효율   :     100.0%
 
 [푸리나 스탯 시트]
-  최종 공격력      :    1,293.3
+  최종 공격력      :    1,293.8
   최종 HP          :   38,875.3
   최종 방어력      :    1,096.2
   치명타 확률      :      51.6%
@@ -34,7 +34,7 @@
   원소 충전 효율   :     265.0%
 
 [에스코피에 스탯 시트]
-  최종 공격력      :    2,036.9
+  최종 공격력      :    2,037.5
   최종 HP          :   23,245.7
   최종 방어력      :      968.1
   치명타 확률      :      38.4%
@@ -42,53 +42,53 @@
   원소 충전 효율   :     265.0%
 
 [모나 스탯 시트]
-  최종 공격력      :    1,730.4
-  최종 HP          :   24,032.2
+  최종 공격력      :    1,731.0
+  최종 HP          :   24,031.2
   최종 방어력      :      791.1
   치명타 확률      :      33.7%
   치명타 피해      :      64.0%
   원소 충전 효율   :     236.9%
 
 [데미지 — 스커크]
-  1단 공격 피해                    non_crit=       1,059  crit=       3,418  expected=       3,019
-  2단 공격 피해                    non_crit=         967  crit=       3,122  expected=       2,758
-  3단 공격 피해 1타                non_crit=         630  crit=       2,033  expected=       1,796
-  3단 공격 피해 2타                non_crit=         630  crit=       2,033  expected=       1,796
-  4단 공격 피해                    non_crit=       1,180  crit=       3,812  expected=       3,367
-  5단 공격 피해                    non_crit=       1,609  crit=       5,197  expected=       4,591
-  강공격 피해 1타                  non_crit=       1,297  crit=       4,189  expected=       3,700
-  강공격 피해 2타                  non_crit=       1,297  crit=       4,189  expected=       3,700
-  낙하 기간 피해                   non_crit=       1,241  crit=       4,008  expected=       3,540
-  저공 추락 충격 피해              non_crit=       2,482  crit=       8,014  expected=       7,079
-  고공 추락 충격 피해              non_crit=       3,100  crit=      10,010  expected=       8,842
-  일곱빛 섬광 1단 공격 피해        non_crit=       6,674  crit=      21,550  expected=      19,036
-  일곱빛 섬광 2단 공격 피해        non_crit=       6,020  crit=      19,437  expected=      17,170
-  일곱빛 섬광 3단 공격 피해 1타    non_crit=       3,805  crit=      12,286  expected=      10,853
-  일곱빛 섬광 3단 공격 피해 2타    non_crit=       3,805  crit=      12,286  expected=      10,853
-  일곱빛 섬광 4단 공격 피해 1타    non_crit=       4,047  crit=      13,067  expected=      11,543
-  일곱빛 섬광 4단 공격 피해 2타    non_crit=       4,047  crit=      13,067  expected=      11,543
-  일곱빛 섬광 5단 공격 피해        non_crit=       9,880  crit=      31,902  expected=      28,180
-  일곱빛 섬광 강공격 피해 1타      non_crit=       2,035  crit=       6,571  expected=       5,804
-  일곱빛 섬광 강공격 피해 2타      non_crit=       2,035  crit=       6,571  expected=       5,804
-  일곱빛 섬광 강공격 피해 3타      non_crit=       2,035  crit=       6,571  expected=       5,804
-  일곱빛 섬광 낙하 기간 피해       non_crit=       2,920  crit=       9,430  expected=       8,330
-  일곱빛 섬광 저공 추락 충격 피해  non_crit=       5,840  crit=      18,856  expected=      16,656
-  일곱빛 섬광 고공 추락 충격 피해  non_crit=       7,294  crit=      23,552  expected=      20,804
-  원소 폭발 참격 피해 1타          non_crit=       6,843  crit=      22,096  expected=      19,518
-  원소 폭발 참격 피해 2타          non_crit=       6,843  crit=      22,096  expected=      19,518
-  원소 폭발 참격 피해 3타          non_crit=       6,843  crit=      22,096  expected=      19,518
-  원소 폭발 참격 피해 4타          non_crit=       6,843  crit=      22,096  expected=      19,518
-  원소 폭발 참격 피해 5타          non_crit=       6,843  crit=      22,096  expected=      19,518
-  원소 폭발 마지막 참격 피해       non_crit=      10,784  crit=      34,822  expected=      30,760
-  C1 수정 칼날 피해                non_crit=      10,792  crit=      34,848  expected=      30,783
+  1단 공격 피해                    non_crit=       1,059  crit=       3,419  expected=       3,019
+  2단 공격 피해                    non_crit=         967  crit=       3,123  expected=       2,757
+  3단 공격 피해 1타                non_crit=         630  crit=       2,033  expected=       1,795
+  3단 공격 피해 2타                non_crit=         630  crit=       2,033  expected=       1,795
+  4단 공격 피해                    non_crit=       1,181  crit=       3,813  expected=       3,367
+  5단 공격 피해                    non_crit=       1,610  crit=       5,199  expected=       4,590
+  강공격 피해 1타                  non_crit=       1,298  crit=       4,190  expected=       3,700
+  강공격 피해 2타                  non_crit=       1,298  crit=       4,190  expected=       3,700
+  낙하 기간 피해                   non_crit=       1,241  crit=       4,009  expected=       3,540
+  저공 추락 충격 피해              non_crit=       2,483  crit=       8,016  expected=       7,078
+  고공 추락 충격 피해              non_crit=       3,101  crit=      10,013  expected=       8,841
+  일곱빛 섬광 1단 공격 피해        non_crit=       6,676  crit=      21,556  expected=      19,034
+  일곱빛 섬광 2단 공격 피해        non_crit=       6,021  crit=      19,443  expected=      17,168
+  일곱빛 섬광 3단 공격 피해 1타    non_crit=       3,806  crit=      12,289  expected=      10,851
+  일곱빛 섬광 3단 공격 피해 2타    non_crit=       3,806  crit=      12,289  expected=      10,851
+  일곱빛 섬광 4단 공격 피해 1타    non_crit=       4,048  crit=      13,071  expected=      11,542
+  일곱빛 섬광 4단 공격 피해 2타    non_crit=       4,048  crit=      13,071  expected=      11,542
+  일곱빛 섬광 5단 공격 피해        non_crit=       9,883  crit=      31,911  expected=      28,177
+  일곱빛 섬광 강공격 피해 1타      non_crit=       2,036  crit=       6,573  expected=       5,804
+  일곱빛 섬광 강공격 피해 2타      non_crit=       2,036  crit=       6,573  expected=       5,804
+  일곱빛 섬광 강공격 피해 3타      non_crit=       2,036  crit=       6,573  expected=       5,804
+  일곱빛 섬광 낙하 기간 피해       non_crit=       2,921  crit=       9,433  expected=       8,329
+  일곱빛 섬광 저공 추락 충격 피해  non_crit=       5,841  crit=      18,861  expected=      16,654
+  일곱빛 섬광 고공 추락 충격 피해  non_crit=       7,296  crit=      23,559  expected=      20,802
+  원소 폭발 참격 피해 1타          non_crit=       6,845  crit=      22,102  expected=      19,516
+  원소 폭발 참격 피해 2타          non_crit=       6,845  crit=      22,102  expected=      19,516
+  원소 폭발 참격 피해 3타          non_crit=       6,845  crit=      22,102  expected=      19,516
+  원소 폭발 참격 피해 4타          non_crit=       6,845  crit=      22,102  expected=      19,516
+  원소 폭발 참격 피해 5타          non_crit=       6,845  crit=      22,102  expected=      19,516
+  원소 폭발 마지막 참격 피해       non_crit=      10,787  crit=      34,832  expected=      30,757
+  C1 수정 칼날 피해                non_crit=      10,795  crit=      34,858  expected=      30,780
 
 [히트] 원소 폭발 참격 피해 1타
-  non_crit=6,843  crit=22,096  expected=19,518
+  non_crit=6,845  crit=22,102  expected=19,516
 
 ■ 스탯 조립
-  공격력: 3,046.3 = 1,032.8 × (1 + 1.6030) + 358.0
-    atk_base 1,032.7676
-      무기 기본 공격력              +674.0000
+  공격력: 3,047.2 = 1,033.1 × (1 + 1.6030) + 358.0
+    atk_base 1,033.1021
+      무기 기본 공격력              +674.3345
       기초 스탯                  +358.7676  (캐릭터 기본)
     atk_pct 1.6030
       무기: 드래곤 슬레이어 영웅담       +0.4800  (비중첩)
@@ -131,8 +131,8 @@
     깊은 회랑의 피날레 2세트         +0.1500
 
 ■ 치명타 / 반응 / 기타
-  crit_rate = 0.831
-    무기 부옵션                 +0.2210
+  crit_rate = 0.8305
+    무기 부옵션                 +0.2205
     성유물 부옵션(깃털)            +0.1480
     성유물 부옵션(시계)            +0.1090
     성유물 부옵션(꽃)             +0.1050
@@ -148,15 +148,15 @@
 
 ■ 공식 (Layer 2)
   coeff                      3.0193
-  stat                       3,046.2940
+  stat                       3,047.1648
   coeff_amp                  1.0500
   flat_dmg_bonus             0.0000
   1+dmg_bonus                1.6160
   def_mult                   0.4872
   res_mult                   0.9000
-  base_dmg                   9,657.5592
+  base_dmg                   9,660.3199
   combined_mult              0.7086
   crit_mult                  3.2290
-  non_crit                   6,842.9007
-  crit                       22,095.7264
-  expected                   19,517.9989   crit_rate=0.831
+  non_crit                   6,844.8568
+  crit                       22,102.0428
+  expected                   19,516.1328   crit_rate=0.831
