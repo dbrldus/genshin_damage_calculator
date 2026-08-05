@@ -1,4 +1,4 @@
-from gidc.core.weapon import Weapon, WeaponSubStat
+from gidc.core.weapon import Weapon
 from gidc.enums import WeaponType
 from gidc.enums import StatType
 from gidc.enums import MoonsignLevel
@@ -21,10 +21,11 @@ class ProspectorsShovel(Weapon):
 
     def __init__(self, refinement: int) -> None:
         super().__init__(
-            weapon_type = WeaponType.POLEARM,
-            base_atk    = 510,
-            refinement  = refinement,
-            sub_stat    = WeaponSubStat(StatType.ATK_PCT, 41.3),
+            weapon_type   = WeaponType.POLEARM,
+            rarity        = 4,
+            tier          = 2,
+            refinement    = refinement,
+            sub_stat_type = StatType.ATK_PCT,
         )
 
     def apply_passive(self, all_hits, wearer) -> None:

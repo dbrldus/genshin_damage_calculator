@@ -11,7 +11,10 @@ from .polearm import (
     ProspectorsShovel, Deathmatch, DialoguesOfTheDesertSages,
     FracturedHalo, SymphonistOfScents, SkywardSpine,
 )
-from .catalyst import FavoniusCodex, ThrillingTalesOfDragonSlayers
+from .catalyst import (
+    StarcallersWatch, FavoniusCodex, SacrificialFragments,
+    ThrillingTalesOfDragonSlayers,
+)
 
 WEAPON_REGISTRY: dict[str, type[Weapon]] = {
     "타오르는 천 개의 태양": AThousandBlazingSuns,
@@ -28,7 +31,9 @@ WEAPON_REGISTRY: dict[str, type[Weapon]] = {
     "파멸의 빛고리":        FracturedHalo,
     "맛의 지휘자":          SymphonistOfScents,
     "천공의 마루":          SkywardSpine,
+    "별지기의 시선":        StarcallersWatch,
     "페보니우스 비전":      FavoniusCodex,
+    "제례의 악장":          SacrificialFragments,
     "드래곤 슬레이어 영웅담": ThrillingTalesOfDragonSlayers,
 }
 

@@ -1,4 +1,4 @@
-from gidc.core.weapon import Weapon, WeaponSubStat
+from gidc.core.weapon import Weapon
 from gidc.enums import WeaponType
 from gidc.enums import StatType
 from gidc.prompt import ask_choice
@@ -20,10 +20,11 @@ class ThrillingTalesOfDragonSlayers(Weapon):
 
     def __init__(self, refinement: int) -> None:
         super().__init__(
-            weapon_type = WeaponType.CATALYST,
-            base_atk    = 401,
-            refinement  = refinement,
-            sub_stat    = WeaponSubStat(StatType.HP_PCT, 35.2),
+            weapon_type   = WeaponType.CATALYST,
+            rarity        = 3,
+            tier          = 2,
+            refinement    = refinement,
+            sub_stat_type = StatType.HP_PCT,
         )
 
     # 고정값 공격력% 기여라 스탯을 읽지 않는다 → Phase 3에서 넣어도 순서와 무관하다.

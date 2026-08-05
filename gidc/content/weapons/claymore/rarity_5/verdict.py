@@ -1,4 +1,4 @@
-from gidc.core.weapon import Weapon, WeaponSubStat
+from gidc.core.weapon import Weapon
 from gidc.enums import WeaponType
 from gidc.enums import StatType
 from gidc.prompt import ask_int
@@ -15,10 +15,11 @@ class Verdict(Weapon):
 
     def __init__(self, refinement: int) -> None:
         super().__init__(
-            weapon_type = WeaponType.CLAYMORE,
-            base_atk    = 674,
-            refinement  = refinement,
-            sub_stat    = WeaponSubStat(StatType.CRIT_RATE, 22.1),
+            weapon_type   = WeaponType.CLAYMORE,
+            rarity        = 5,
+            tier          = 3,
+            refinement    = refinement,
+            sub_stat_type = StatType.CRIT_RATE,
         )
 
     def apply_passive(self, all_hits, wearer) -> None:

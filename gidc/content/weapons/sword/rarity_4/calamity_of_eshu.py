@@ -1,4 +1,4 @@
-from gidc.core.weapon import Weapon, WeaponSubStat
+from gidc.core.weapon import Weapon
 from gidc.core.profile import SkillType
 from gidc.enums import WeaponType
 from gidc.enums import StatType
@@ -26,10 +26,11 @@ class CalamityOfEshu(Weapon):
 
     def __init__(self, refinement: int) -> None:
         super().__init__(
-            weapon_type = WeaponType.SWORD,
-            base_atk    = 565,
-            refinement  = refinement,
-            sub_stat    = WeaponSubStat(StatType.ATK_PCT, 27.6),
+            weapon_type   = WeaponType.SWORD,
+            rarity        = 4,
+            tier          = 3,
+            refinement    = refinement,
+            sub_stat_type = StatType.ATK_PCT,
         )
 
     def apply_passive(self, all_hits, wearer) -> None:

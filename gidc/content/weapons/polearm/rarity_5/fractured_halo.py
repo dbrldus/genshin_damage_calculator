@@ -1,4 +1,4 @@
-from gidc.core.weapon import Weapon, WeaponSubStat
+from gidc.core.weapon import Weapon
 from gidc.enums import WeaponType
 from gidc.enums import StatType
 from gidc.prompt import ask_bool
@@ -17,10 +17,11 @@ class FracturedHalo(Weapon):
 
     def __init__(self, refinement: int) -> None:
         super().__init__(
-            weapon_type = WeaponType.POLEARM,
-            base_atk    = 608,
-            refinement  = refinement,
-            sub_stat    = WeaponSubStat(StatType.CRIT_DMG, 66.2),
+            weapon_type   = WeaponType.POLEARM,
+            rarity        = 5,
+            tier          = 2,
+            refinement    = refinement,
+            sub_stat_type = StatType.CRIT_DMG,
         )
 
     def apply_passive(self, all_hits, wearer) -> None:

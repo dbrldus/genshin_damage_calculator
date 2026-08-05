@@ -1,4 +1,4 @@
-from gidc.core.weapon import Weapon, WeaponSubStat
+from gidc.core.weapon import Weapon
 from gidc.enums import WeaponType
 from gidc.enums import StatType
 
@@ -12,10 +12,11 @@ class FavoniusCodex(Weapon):
 
     def __init__(self, refinement: int) -> None:
         super().__init__(
-            weapon_type = WeaponType.CATALYST,
-            base_atk    = 510,
-            refinement  = refinement,
-            sub_stat    = WeaponSubStat(StatType.ENERGY_RECHARGE, 45.9),
+            weapon_type   = WeaponType.CATALYST,
+            rarity        = 4,
+            tier          = 2,
+            refinement    = refinement,
+            sub_stat_type = StatType.ENERGY_RECHARGE,
         )
 
     def apply_passive(self, all_hits, wearer) -> None:

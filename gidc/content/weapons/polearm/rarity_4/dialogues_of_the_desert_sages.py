@@ -1,4 +1,4 @@
-from gidc.core.weapon import Weapon, WeaponSubStat
+from gidc.core.weapon import Weapon
 from gidc.enums import WeaponType
 from gidc.enums import StatType
 
@@ -18,10 +18,11 @@ class DialoguesOfTheDesertSages(Weapon):
 
     def __init__(self, refinement: int) -> None:
         super().__init__(
-            weapon_type = WeaponType.POLEARM,
-            base_atk    = 510,
-            refinement  = refinement,
-            sub_stat    = WeaponSubStat(StatType.HP_PCT, 41.3),
+            weapon_type   = WeaponType.POLEARM,
+            rarity        = 4,
+            tier          = 2,
+            refinement    = refinement,
+            sub_stat_type = StatType.HP_PCT,
         )
 
     def apply_passive(self, all_hits, wearer) -> None:

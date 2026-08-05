@@ -1,4 +1,4 @@
-from gidc.core.weapon import Weapon, WeaponSubStat
+from gidc.core.weapon import Weapon
 from gidc.enums import WeaponType
 from gidc.enums import StatType
 from gidc.prompt import ask_int
@@ -23,10 +23,11 @@ class PeakPatrolSong(Weapon):
 
     def __init__(self, refinement: int) -> None:
         super().__init__(
-            weapon_type = WeaponType.SWORD,
-            base_atk    = 542,
-            refinement  = refinement,
-            sub_stat    = WeaponSubStat(StatType.DEF_PCT, 82.7),
+            weapon_type   = WeaponType.SWORD,
+            rarity        = 5,
+            tier          = 1,
+            refinement    = refinement,
+            sub_stat_type = StatType.DEF_PCT,
         )
 
     def apply_passive(self, all_hits, wearer) -> None:
