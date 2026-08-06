@@ -61,9 +61,11 @@
   .subs select { flex:1; min-width:0; }
   .subs input { width:4.5rem; }
 
-  /* 빌드 JSON 주고받기 — 빌드 편집 창 위에 겹쳐 뜬다 */
+  /* 빌드 주고받기 — 저장된 빌드 드롭다운 + JSON. JSON 창은 편집 창 위에 겹쳐 뜬다 */
   .art-share { display:flex; gap:.4rem; align-items:center; margin:.5rem 0 .2rem; font-size:.85rem; }
   .art-share .name { flex:1; color:var(--dim); }
+  /* 빌드 이름이 길어도 버튼을 밀어내지 않게 — 줄지언정 넘치지 않는다 */
+  .art-share select { flex:0 1 12rem; min-width:0; font-size:.8rem; }
   #sharebody { padding:.9rem; display:flex; flex-direction:column; gap:.6rem; }
   #sharehint { font-size:.82rem; }
   #sharetext { width:100%; box-sizing:border-box; height:18rem; max-height:50vh; resize:vertical;
@@ -73,6 +75,16 @@
   #sharemsg.err { color:var(--err); }
   #sharemsg.ok  { color:var(--dim); }
   #sharebtns { display:flex; gap:.5rem; justify-content:flex-end; }
+
+  /* 데미지 — 캐릭터마다 블록 하나 (히트 표 + 반응 표).
+     격변은 계수도 %피해 보너스도 안 타고 반응 치명타가 없으면 비크리=크리라
+     열의 의미가 히트와 다르다. 그래서 같은 표에 섞지 않고 소제목으로 나눈다. */
+  #damage .dmg-char { font-size:.92rem; font-weight:600; margin:1.1rem 0 .3rem;
+                      padding-bottom:.2rem; border-bottom:1px solid var(--line); }
+  #damage > .dmg-char:first-child { margin-top:0; }
+  #damage .dmg-sub { color:var(--dim); font-size:.82rem; margin:.7rem 0 .2rem; }
+  #damage .rx { display:inline-flex; gap:.25rem; flex-wrap:wrap; justify-content:flex-end; }
+  #damage .rx button.on { border-color:currentColor; background:#8883; font-weight:600; }
 
   /* 히트 설명 — 데미지 행을 누르면 열린다 */
   #damage tr.hit { cursor:pointer; }
@@ -119,6 +131,7 @@
 <h1>원신 데미지 계산기 — Pyodide PoC</h1>
 <div class="sub" style="margin-bottom:1rem">
   파이썬 엔진이 브라우저 안에서 그대로 돌아갑니다. 서버 없음.
+  <b>+ 캐릭터 추가</b>로 파티를 편성하세요.
   파티원의 <b>빌드</b> 버튼으로 성유물·무기를 바꾸면 즉시 재계산되고, 질문에 답하면 새 질문이 드러납니다.
   데미지 표의 <b>히트를 누르면</b> 그 숫자가 왜 나왔는지 — 공식과 버프별 기여 — 를 펼쳐 봅니다.
 </div>
@@ -143,7 +156,7 @@
     <h2>스탯 시트</h2>
     <table id="stats"></table>
     <h2>데미지 <span id="dmgtarget" class="sub"></span></h2>
-    <div style="max-height:55vh; overflow:auto"><table id="damage"></table></div>
+    <div style="max-height:55vh; overflow:auto"><div id="damage"></div></div>
   </div>
 </div>
 
@@ -183,6 +196,6 @@
 <!-- ?v= 는 캐시 무효화용 app.js 내용 해시. 손으로 고치지 않는다 —
      python tools/sync_web.py 가 저장할 때마다 다시 계산해 넣는다.
      (python -m http.server 는 Cache-Control 을 안 붙여서 브라우저가 옛 파일을 계속 쓴다) -->
-<script src="app.js?v=616449f8"></script>
+<script src="app.js?v=6b759658"></script>
 </body>
 </html>

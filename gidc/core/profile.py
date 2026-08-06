@@ -618,7 +618,7 @@ def _reaction_crit_dmg(hit: SkillHit, reaction_type: ReactionType) -> float:
 
 
 # ── 반응 배율표 ──────────────────────────────────────────────────────────
-# 대부분 반응별 고정값. 증발/용해는 트리거 원소, 달반응은 dmg_type에 따라 갈린다.
+# 대부분 반응별 고정값. 증발/융해는 트리거 원소, 달반응은 dmg_type에 따라 갈린다.
 _REACTION_MULT_CONST: dict[ReactionType, float] = {
     ReactionType.BURNING:        0.25,
     ReactionType.SWIRL:          0.6,
@@ -790,6 +790,55 @@ def build_damage_context(
     )
 
 
+def build_transformative_context(
+    hit:        SkillHit,
+    enemy:      Enemy,
+    *,
+    reaction:   ReactionType,
+    element:    Element,
+    char_level: int = 90,
+) -> DamageContext:
+    """격변 반응 1회의 피해 컨텍스트. hit은 **스탯 캐리어**일 뿐 때리는 히트가 아니다.
+
+    격변은 트리거한 캐릭터의 EM·레벨·반응 보너스만으로 정해지는 별도의 피해 인스턴스다
+    — 계수도, 스탯 스케일도, %피해 보너스도, 방어력 배율도 타지 않는다(_calc_transformative).
+    그래서 build_damage_context와 달리 캐리어 히트에서 **반응에 관계된 필드만** 골라 읽는다.
+    히트마다 부르는 것이 아니라 캐릭터마다 한 번 부르고, 캐리어로는 그 캐릭터의 히트 아무
+    것이나 넘기면 된다(EM·반응 보너스는 히트에 걸린 버프가 아니라 캐릭터의 것이다).
+
+    element는 **피해 원소**이며 반응이 정한다 — 과부하는 트리거가 번개든 불이든 불 내성을
+    탄다. 캐리어 히트의 원소가 아니다. 확산만 확산된 원소가 그때그때 들어온다.
+    후보와 피해 원소는 core.reaction.transformative_candidates가 유도한다.
+    """
+    return DamageContext(
+        # 격변은 계수도 스탯도 읽지 않는다. 0은 '없음'이 아니라 '이 경로가 쓰지 않는
+        # 자리'라는 뜻이다 — DamageContext에 기본값이 없어서 채울 뿐이다.
+        stat_value = 0.0,
+        coeff      = 0.0,
+        dmg_type   = DmgType.TRANSFORMATIVE,
+
+        # 캐리어 히트의 flat_dmg_bonus는 **직접 피해용**이라 여기로 넘기면 안 된다.
+        # (시틀라리 C1은 다른 캐릭터의 전 히트에 EM×200%를 얹는데 그 효과는 일반/강/낙하/
+        #  스킬/폭발 한정이고, 제사의 여운 4세트는 아예 일반 공격 전용이다. 그대로 넘기면
+        #  격변 피해가 조용히 부풀려진다.) 격변에 더해지는 고정 피해가 실제로 생기면
+        #  그때 전용 필드를 신설한다 — damage_input_fields도 이 0에 맞춰져 있다.
+        flat_dmg_bonus = 0.0,
+
+        elemental_mastery   = hit.elemental_mastery,
+        reaction_multiplier = _REACTION_MULT_CONST[reaction],
+        reaction_bonus      = _reaction_bonus(hit, reaction),
+        reaction_crit_rate  = _reaction_crit_rate(hit, reaction),
+        reaction_crit_dmg   = _reaction_crit_dmg(hit, reaction),
+
+        char_level = char_level,
+        # 적 기본 내성은 enemy에서, 내성 **감소**는 캐리어 히트에서 온다 — 후자는 트리거
+        # 캐릭터가 받은 버프라 캐리어에서 읽는 것이 맞다.
+        enemy_resistance = _enemy_resistance(hit, enemy, element),
+        # enemy_level은 넘기지 않는다 — 격변은 defense_mult를 부르지 않는다(방어력 무시).
+        # coeff_amp·dmg_bonus·crit_rate/crit_dmg·def_*·lunar_*·elevation도 같은 이유로 없다.
+    )
+
+
 # 직접 피해 계열 — 계수 증폭·피해 보너스 풀(%DMG)·방어력 배율을 모두 쓰는 경로다.
 # 격변과 달반응은 반응 피해라 셋 다 안 받는다. 달반응 직접 피해는 계수×스탯만 쓴다.
 # damage.py의 _calc_* 와 어긋나면 화면에 '적용됨'으로 뜬 항목이 실제로는 안 곱해진다.
@@ -814,7 +863,13 @@ def damage_input_fields(
     reaction_type, dmg_type = resolve_reaction(hit, reaction_type, dmg_type)
     element = hit.element if hit.element is not None else Element.PHYSICAL
 
-    fields = {"flat_dmg_bonus", element_res_reduction_field(element)}
+    fields = {element_res_reduction_field(element)}
+
+    # 격변만 flat_dmg_bonus를 안 받는다 — build_transformative_context가 0으로 못박기
+    # 때문이다(캐리어 히트에 쌓인 값은 직접 피해용이다). 나머지 경로는 damage.py의
+    # _calc_* 가 모두 이 필드를 읽는다.
+    if dmg_type is not DmgType.TRANSFORMATIVE:
+        fields.add("flat_dmg_bonus")
 
     # 격변 피해만 반응 전용 치명타 필드를 쓴다 (_calc_transformative). 나머지는 평소 치명타.
     if dmg_type is DmgType.TRANSFORMATIVE:

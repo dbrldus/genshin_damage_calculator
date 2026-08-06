@@ -45,14 +45,16 @@ from gidc.core.explain import (
     explain_hit,
 )
 from gidc.core.party import Party
-from gidc.core.profile import build_damage_context, damage_input_fields, set_recording
+from gidc.core.profile import (
+    build_damage_context, build_transformative_context, damage_input_fields, set_recording,
+)
+from gidc.core.reaction import aura_pool, hit_candidates, transformative_candidates
 from gidc.enums import (
-    ArtifactSet, ArtifactSlot, CharacterTrait, DmgType, Element, ReactionType, StatType,
+    ArtifactSet, ArtifactSlot, CharacterTrait, Element, ReactionType, StatType,
 )
 from gidc.content.artifacts import ARTIFACT_REGISTRY, make_artifact
 from gidc.content.characters import CHARACTER_REGISTRY, make_character
 from gidc.content.weapons import WEAPON_REGISTRY, make_weapon
-from gidc.presets import PRESET_REGISTRY, build_preset
 from gidc.prompt import MappingSource, using
 
 SLOT_KEYS = [s.name.lower() for s in ArtifactSlot]   # flower feather sands goblet circlet
@@ -92,10 +94,10 @@ def get_registries() -> dict:
         # 무기 레벨 규칙은 성급으로 갈린다(1·2성만 Lv.70/4돌파에서 끝난다). 그래서
         # 캐릭터처럼 표 하나가 아니라 성급별로 나눠 넘긴다.
         "weaponLevels": _weapon_levels(),
-        "reactions":    [r.name for r in ReactionType],
-        "dmgTypes":     [d.name for d in DmgType],
+        # 반응 목록은 여기서 내보내지 않는다 — 고를 수 있는 반응은 히트 원소와 파티 구성에
+        # 따라 다르고, 전체 목록을 주면 불가능한 조합까지 고를 수 있다는 뜻이 된다.
+        # 히트별 후보는 run_calculation의 damage[].hits[].candidates로 온다.
         "traits":       [{"id": t.name, "label": t.value} for t in CharacterTrait],
-        "presets":      _presets(),
         "counts": {
             "characters":   len(CHARACTER_REGISTRY),
             "weapons":      len(WEAPON_REGISTRY),
@@ -146,29 +148,18 @@ def _weapon_levels() -> dict:
     return out
 
 
-def _presets() -> list[dict]:
-    """프리셋 목록 + 각각이 만드는 캐릭터 정보.
-
-    build()는 유저 입력을 묻지 않고 객체만 조립하므로(히트 생성은 build_hits 이후다)
-    목록을 만들려고 11번 호출해도 안전하고 빠르다."""
-    out = []
-    for name, build in sorted(PRESET_REGISTRY.items()):
-        char = build()
-        out.append({
-            "id":            name,
-            "char":          char.name,
-            "element":       char.element.value,
-            "constellation": char.constellation,
-        })
-    return out
-
-
 # ══════════════════════════════════════════════════════════════════════════
 #  빌드시트 ↔ Character
 # ══════════════════════════════════════════════════════════════════════════
-def preset_to_sheet(name: str) -> dict:
-    """프리셋을 편집 가능한 빌드시트로 편다. UI의 출발점."""
-    return char_to_spec(build_preset(name))
+def blank_sheet(name: str) -> dict:
+    """등록된 캐릭터 하나를 맨몸 빌드시트로 — 무기도 성유물도 없는 출발점.
+
+    화면이 캐릭터를 얻는 유일한 경로다. 파티에 넣을 때도, 슬롯의 캐릭터를 바꿀 때도
+    여기서 시작해 사용자가 직접 채운다.
+
+    기본값(레벨·돌파·명함·특성 레벨)을 여기 적지 않고 char_from_spec에 이름만 넘겨
+    받아 온다 — 같은 기본값이 두 군데에 적히면 조용히 어긋난다."""
+    return char_to_spec(char_from_spec({"character": name}))
 
 
 def char_to_spec(char) -> dict:
@@ -372,13 +363,17 @@ def _members_from_sheet(sheet: dict) -> tuple[list, list[dict]]:
     """파티를 만든다. 캐릭터 하나가 실패해도 나머지 오류를 함께 모아 돌려준다."""
     members, errors = [], []
     for i, entry in enumerate(sheet.get("party") or []):
-        # 문자열이면 프리셋 이름(구버전 호출), dict면 빌드시트
+        # 빌드시트(dict)만 받는다. 예전에는 문자열을 프리셋 이름으로도 받았지만 프리셋은
+        # 엔진에서 빠졌다 — 그대로 두면 char_from_spec 안에서 TypeError로 터진다.
+        if not isinstance(entry, dict):
+            errors.append({"index": i, "character": f"#{i + 1}",
+                           "message": "파티 원소는 빌드시트(객체)여야 합니다."})
+            continue
         try:
-            members.append(build_preset(entry) if isinstance(entry, str)
-                           else char_from_spec(entry))
+            members.append(char_from_spec(entry))
         except (ValueError, KeyError) as e:
-            name = entry if isinstance(entry, str) else entry.get("character", f"#{i + 1}")
-            errors.append({"index": i, "character": name, "message": str(e)})
+            errors.append({"index": i, "character": entry.get("character", f"#{i + 1}"),
+                           "message": str(e)})
     return members, errors
 
 
@@ -409,15 +404,16 @@ def run_calculation(sheet, answers=None) -> dict:
     except (ValueError, AssertionError) as e:
         return _empty([{"index": -1, "character": "", "message": str(e)}])
 
-    enemy    = Enemy(level=int((sheet.get("enemy") or {}).get("level", 90)))
-    reaction = ReactionType[settings.get("reaction", "NONE")]
-    dmg_type = DmgType[settings["dmgType"]] if settings.get("dmgType") else None
-    targets  = set(settings.get("targets") or [])
+    enemy = Enemy(level=int((sheet.get("enemy") or {}).get("level", 90)))
+    # 반응은 히트마다 다르다 — {캐릭터: {히트: 반응}}. 전역 스위치는 얼음 히트에 증발
+    # 2.0배가 붙는 식으로 조용히 틀리므로 두지 않는다(core.reaction 참고).
+    hit_reactions = settings.get("hitReactions") or {}
+    targets       = set(settings.get("targets") or [])
 
     return {
         "stats":   _stats(all_hits),
-        "damage":  _damage(all_hits, enemy, reaction, dmg_type, targets),
-        "explain": _explain(all_hits, enemy, reaction, dmg_type,
+        "damage":  _damage(all_hits, enemy, members, hit_reactions, targets),
+        "explain": _explain(all_hits, enemy, members, hit_reactions,
                             targets, settings.get("explain")),
         "questions": [q.to_dict() for q in source.asked],
         "pending":   [q.id for q in source.pending],
@@ -455,25 +451,82 @@ def _stats(all_hits) -> list[dict]:
 # 방어력 배율과 반응 레벨 배율은 **때리는 캐릭터 자신의 레벨**로 정해진다. 파티에
 # 레벨이 섞여 있으면(Lv.80 시틀라리 + Lv.90 딜러) 한 값으로 뭉뚱그릴 수 없고, Lv.80을
 # 90으로 계산하면 방어력 배율이 0.4865 대신 0.5가 되어 피해가 2.78% 부풀려진다.
-def _damage(all_hits, enemy, reaction, dmg_type, targets) -> list[dict]:
+def _damage(all_hits, enemy, members, hit_reactions, targets) -> list[dict]:
+    """캐릭터마다 블록 하나. 히트(직접 피해)와 반응(격변 1회)을 나눠 담는다.
+
+    둘은 열의 의미가 다르다 — 격변은 계수도 스탯도 %피해 보너스도 타지 않고, 반응 전용
+    치명타가 없으면 비크리와 크리가 같은 값이 된다. 그래서 한 표에 섞지 않는다.
+    """
     out = []
     for char, hits in all_hits.items():
         if targets and char.name not in targets:
             continue
+        aura     = aura_pool(members, char)
+        selected = hit_reactions.get(char.name) or {}
+
+        hit_rows = []
         for hit in hits.values():
-            ctx = build_damage_context(
-                hit, enemy,
-                reaction_type=reaction, dmg_type=dmg_type, char_level=char.level,
-            )
+            candidates = _hit_candidates(hit, aura)
+            reaction   = _selected_reaction(selected.get(hit.name), candidates)
+            ctx = build_damage_context(hit, enemy,
+                                       reaction_type=reaction, char_level=char.level)
             r = calculate(ctx)
-            out.append({
-                "char":     char.name,
-                "hit":      hit.name,
-                "nonCrit":  r.non_crit,
-                "crit":     r.crit,
-                "expected": r.expected,
+            hit_rows.append({
+                "hit":        hit.name,
+                "candidates": [{"id": c.name, "label": c.value} for c in candidates],
+                "reaction":   reaction.name,
+                "nonCrit":    r.non_crit,
+                "crit":       r.crit,
+                "expected":   r.expected,
             })
+
+        # 격변은 「평타로 낸 과부하」와 「폭발로 낸 과부하」가 따로 있지 않다 — 트리거
+        # 캐릭터의 EM만 걸리므로 히트 루프 바깥에서 캐리어 하나를 잡고 반응만 돈다.
+        carrier = next(iter(hits.values()), None)
+        reaction_rows = []
+        if carrier is not None:
+            for reaction, element in transformative_candidates(char.element, aura):
+                ctx = build_transformative_context(
+                    carrier, enemy,
+                    reaction=reaction, element=element, char_level=char.level,
+                )
+                r = calculate(ctx)
+                reaction_rows.append({
+                    "reaction": reaction.name,
+                    "label":    reaction.value,
+                    "element":  element.value,
+                    "nonCrit":  r.non_crit,
+                    "crit":     r.crit,
+                    "expected": r.expected,
+                })
+
+        out.append({"char": char.name, "hits": hit_rows, "reactions": reaction_rows})
     return out
+
+
+def _hit_candidates(hit, aura) -> tuple:
+    """이 히트에 유저가 고를 수 있는 반응. 내재 반응을 선언한 히트는 후보가 없다.
+
+    이네파의 달감전 피해처럼 히트가 반응을 내장한 경우 resolve_reaction이 바깥에서 넘긴
+    반응을 무시하므로, 버튼을 내면 눌러도 숫자가 안 바뀌어 화면이 거짓말을 하게 된다.
+    """
+    if hit.reaction_type is not ReactionType.NONE:
+        return ()
+    return hit_candidates(hit.element, aura)
+
+
+def _selected_reaction(name, candidates) -> ReactionType:
+    """저장된 선택이 **지금도 가능한** 반응일 때만 받아들인다.
+
+    파티를 바꿔 증발이 불가능해졌는데 예전 선택이 남아 있으면 조용히 틀린 숫자가 나온다.
+    화면이 선택을 비워 주더라도 정확성은 엔진이 책임진다.
+    """
+    if not name:
+        return ReactionType.NONE
+    for c in candidates:
+        if c.name == name:
+            return c
+    return ReactionType.NONE
 
 
 # 묶음 구성은 explain.py의 텍스트 렌더러가 쓰는 것과 같은 목록이다.
@@ -522,7 +575,7 @@ _FORMULA_HIDDEN = {"combined_mult"}
 _STAT_FIELDS = {f"{pre}_{tag}" for _, pre in _STAT_TRIPLES for tag in _STAT_PARTS}
 
 
-def _explain(all_hits, enemy, reaction, dmg_type, targets, hit_name) -> dict | None:
+def _explain(all_hits, enemy, members, hit_reactions, targets, hit_name) -> dict | None:
     """버프 귀속. Explain은 이미 구조화돼 있어 그대로 편다 (to_text()는 쓰지 않는다).
 
     화면 구성(스탯 조립 / 보너스 풀 / 치명타·반응 / 공식)까지 여기서 짜 준다.
@@ -536,11 +589,15 @@ def _explain(all_hits, enemy, reaction, dmg_type, targets, hit_name) -> dict | N
         hit = hits.get(hit_name)
         if hit is None:
             continue
-        ex = explain_hit(hit, enemy=enemy, reaction_type=reaction,
-                         dmg_type=dmg_type, char_level=char.level)
+        # 표에 보이는 그 숫자를 설명해야 하므로 반응도 _damage와 같은 규칙으로 정한다.
+        reaction = _selected_reaction(
+            (hit_reactions.get(char.name) or {}).get(hit_name),
+            _hit_candidates(hit, aura_pool(members, char)),
+        )
+        ex = explain_hit(hit, enemy=enemy, reaction_type=reaction, char_level=char.level)
         # 이 히트가 실제로 읽는 필드. 나머지는 값이 붙어 있어도 이 숫자와 무관하다
         # — 화면은 그것을 접어 둔다.
-        applied = damage_input_fields(hit, reaction_type=reaction, dmg_type=dmg_type)
+        applied = damage_input_fields(hit, reaction_type=reaction)
         return {
             "char":    char.name,
             "hit":     ex.name,

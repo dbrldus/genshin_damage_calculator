@@ -152,7 +152,7 @@ class Xilonen(Character):
     _SAMPLE_SLOTS = 3
     _SAMPLE_CONVERTING_ELEMENTS = (Element.PYRO, Element.HYDRO, Element.CRYO, Element.ELECTRO)
 
-    # 전환된 샘플이 이 수에 못 미치면(= 바위로 유지되는 칸이 2개 이상이면) 전환된 샘플이
+    # 전환된 샘플이 이 수에 못 미치면(= 바위로 유지되는 칸이 2개 이상이면) 샘플이
     # 내성을 감소시키지 못하고, 대신 A1이 일반/낙하 피해 증가를 준다. 같은 문턱의 양면이다.
     _SHRED_MIN_CONVERTED = 2
 
@@ -176,15 +176,16 @@ class Xilonen(Character):
     def _active_sample_elements(self, all_hits: dict["Character", dict[str, SkillHit]]) -> list[Element]:
         """내성 감소가 실제로 걸리는 샘플 원소 (중복 제거).
 
-        전환된 샘플이 2개 미만이면 — 즉 바위로 유지되는 칸이 2개 이상이면 — 전환된 샘플은
-        내성을 깎지 못한다. 전환되지 않고 남은 바위 샘플은 C2에서만 활성 상태를 유지하며,
-        이쪽은 위 문턱과 무관하게 걸린다."""
+        전환된 샘플이 2개 이상이면 샘플 전체가 활성화된다 — 전환된 칸은 물론 전환되지 않고
+        남은 바위 칸도 같이 걸린다. 2개 미만이면 A1이 피해 증가 쪽으로 넘어가면서 샘플이
+        내성을 깎지 못하는데, C2는 그 상황에서도 바위 칸만은 활성 상태로 남긴다."""
         converted = self._converted_sample_elements(all_hits)
         kept_geo  = self._SAMPLE_SLOTS - len(converted)
+        shredding = len(converted) >= self._SHRED_MIN_CONVERTED
 
-        active = converted if len(converted) >= self._SHRED_MIN_CONVERTED else []
-        if kept_geo and self.constellation >= 2:
-            active = [*active, Element.GEO]
+        active = list(converted) if shredding else []
+        if kept_geo and (shredding or self.constellation >= 2):
+            active.append(Element.GEO)
         return list(dict.fromkeys(active))
 
     # ── 개인 버프 ─────────────────────────────────────────────────────────
@@ -216,9 +217,14 @@ class Xilonen(Character):
             sk = self._skill_index()
             self._reduction = self._RES_REDUCTION[sk]
 
-            # C2: 음원 샘플 활성 시 동일 원소 파티원 버프 중 코어 스탯(atk_pct/hp_pct)만 여기서
+            # C2: 음원 샘플 활성 시 동일 원소 파티원 버프 중 코어 스탯(atk_pct/hp_pct)만 여기서.
+            # 「활성화된」 샘플의 원소만 버프를 준다 — 파티에 있는 원소라도 그 칸이 활성화되지
+            # 않았으면(전환 2개 미만이라 바위만 남는 C2 상황 등) 해당 캐릭터는 못 받는다.
             if c >= 2:
+                active = set(self._active_sample_elements(all_hits))
                 for char, char_hits in all_hits.items():
+                    if char.element not in active:
+                        continue
                     for hit in char_hits.values():
                         match char.element:
                             case Element.PYRO:  hit.add("atk_pct", 0.45, self, note="C2 음원 샘플")
@@ -245,7 +251,9 @@ class Xilonen(Character):
 
         # 샘플이 가질 수 있는 원소는 바위(초기값)와 전환 대상 4종뿐이다 —
         # 바람/풀 파티원은 샘플을 전환하지 않으므로 실로닌은 두 원소를 깎지 못한다.
-        for element in self._active_sample_elements(all_hits):
+        active = self._active_sample_elements(all_hits)
+
+        for element in active:
             for char_hits in all_hits.values():
                 for hit in char_hits.values():
                     match element:
@@ -256,8 +264,11 @@ class Xilonen(Character):
                         case Element.GEO:     hit.add("geo_res_reduction",     -self._reduction, self, note="E 내성 감소")
 
         # C2: 음원 샘플 활성 시 동일 원소 파티원 버프 중 코어 아닌 것만 여기서
+        # (활성 조건은 Phase 4의 atk_pct/hp_pct 쪽과 같다 — 위 active를 그대로 쓴다)
         if c >= 2:
             for char, char_hits in all_hits.items():
+                if char.element not in active:
+                    continue
                 for hit in char_hits.values():
                     match char.element:
                         case Element.GEO:  hit.add("all_dmg_bonus", 0.50, self, note="C2 음원 샘플")

@@ -23,9 +23,17 @@ let api = null;
 let reg = null;           // get_registries() 결과
 let party = [];           // 빌드시트 spec 배열
 let answers = {};
+// 히트별 상황 반응 — { 캐릭터명: { 히트명: "VAPORIZE" } }.
+// 파티가 바뀌어 불가능해진 선택은 엔진이 무반응으로 되돌려 보내므로(_selected_reaction)
+// 여기서 지우지 않는다. 버튼의 눌림 상태는 저장값이 아니라 엔진이 되돌려준 값으로 그린다.
+let hitReactions = {};
 let target = "";
 let enemyLevel = 100;
 let editing = null;       // 빌드 창이 열려 있는 파티 인덱스 (닫혀 있으면 null)
+// 지금 편집 중인 슬롯이 어느 저장 빌드에서 왔는가 (드롭다운의 선택 표시 + 저장할 때
+// 기본 이름). 빌드 창은 구조가 바뀔 때마다 통째로 다시 그려지므로 선택 상태를
+// DOM이 아니라 여기서 복원해야 한다.
+let editorBuildName = null;
 
 function make(tag, props = {}, ...kids) {
   const n = document.createElement(tag);
@@ -49,7 +57,7 @@ function sheet(extra = {}) {
     // 캐릭터 레벨은 여기서 보내지 않는다 — 방어력/반응 레벨 배율은 때리는 캐릭터
     // 자신의 레벨로 정해지므로 엔진이 party[i].level 을 직접 읽는다. 하나로 뭉치면
     // 레벨이 섞인 파티에서 틀리고, Lv.80 을 90 으로 계산하면 피해가 2.78% 부풀려진다.
-    settings: { reaction: "NONE", targets: target ? [target] : [], ...extra },
+    settings: { hitReactions, targets: target ? [target] : [], ...extra },
   };
 }
 
@@ -60,9 +68,11 @@ function unwrap(proxy) {
   return out;
 }
 
+const msgOf = (e) => (e && e.message ? e.message : String(e));
+
 function fail(what, e) {
   status_.className = "err";
-  status_.textContent = what + ":\n" + (e && e.message ? e.message : String(e));
+  status_.textContent = what + ":\n" + msgOf(e);
   console.error(e);
 }
 
@@ -81,10 +91,9 @@ async function boot() {
     api = py.pyimport("gidc.web_api");
     reg = unwrap(api.get_registries());
 
-    // 기본 파티: 스커크 조합을 빌드시트로 펴서 시작한다
-    party = ["skirk_party/skirk", "skirk_party/furina",
-             "skirk_party/escoffier", "skirk_party/mona"]
-            .map((n) => unwrap(api.preset_to_sheet(n)));
+    // 빈 파티로 시작한다. 예시 조합을 깔아 두면 내 파티를 짜기 전에 남의 빌드를 먼저
+    // 지워야 하고, 화면의 숫자가 내 것인지 예시인지 헷갈린다.
+    party = [];
 
     const t1 = performance.now();
     status_.textContent =
@@ -135,13 +144,16 @@ function renderParty() {
       make("div", { className: "line sub", textContent: slotSummary(c) })));
   });
 
+  // 추가하는 캐릭터는 맨몸으로 들어온다 — 무기도 성유물도 없는 기본 스펙.
+  // 프리셋으로 넣으면 남이 짜 둔 빌드가 딸려 와서, 내 빌드를 넣으려면 먼저 지워야 한다.
+  // 목록은 등록된 캐릭터 전부다 (프리셋이 있든 없든).
   if (party.length < MAX_PARTY) {
     const add = make("select");
     add.add(new Option("+ 캐릭터 추가", ""));
-    for (const p of reg.presets) add.add(new Option(`${p.char} · ${p.id}`, p.id));
+    for (const c of reg.characters) add.add(new Option(c.name, c.name));
     add.onchange = () => {
       if (!add.value) return;
-      party.push(unwrap(api.preset_to_sheet(add.value)));
+      party.push(unwrap(api.blank_sheet(add.value)));
       structuralChange();
     };
     box.append(make("div", { className: "slot" }, add));
@@ -176,21 +188,20 @@ function weaponSummary(w) {
   return `${w.name} Lv${w.level}` + (forked ? `·${w.ascension}돌파` : "");
 }
 
-// 캐릭터를 바꾸면 그 캐릭터의 프리셋이 있으면 그것으로, 없으면 무기를 비운다
-// (무기 종류가 안 맞으면 엔진이 거부하기 때문).
+// 캐릭터를 바꾸면 그 캐릭터의 맨몸 빌드로 갈아 끼운다 — [+ 캐릭터 추가]와 같은 출발점이다.
+// 앞 캐릭터의 레벨·성유물을 물려주지 않는 이유: 다른 캐릭터를 골랐다는 건 이 슬롯을
+// 새로 짜겠다는 뜻이고, 물려받은 값은 내가 정한 것처럼 보이면서 실은 남의 빌드 잔해다.
+// (무기는 어차피 종류가 안 맞으면 엔진이 거부한다.)
 function swapCharacter(i, name) {
-  const preset = reg.presets.find((p) => p.char === name);
-  if (preset) {
-    party[i] = unwrap(api.preset_to_sheet(preset.id));
-  } else {
-    party[i] = { ...party[i], character: name, weapon: null, traits: [] };
-  }
+  party[i] = unwrap(api.blank_sheet(name));
+  editorBuildName = null;
   structuralChange(true);
 }
 
 // ── 빌드 편집 창 ─────────────────────────────────────────────────────────
 function openEditor(i) {
   editing = i;
+  editorBuildName = null;   // 슬롯이 바뀌었다 — 앞 슬롯에서 고른 이름을 물려받으면 안 된다
   renderEditor();
   $("editor").showModal();
 }
@@ -250,9 +261,42 @@ function buildEditor(c) {
   c.artifacts = c.artifacts || {};
   const d = make("div");
 
-  // 빌드 JSON 주고받기
+  // 빌드 주고받기 — 이 브라우저에 저장해 둔 빌드(왼쪽)와 JSON(오른쪽).
+  // 드롭다운에는 지금 캐릭터로 저장한 빌드만 올린다. 다른 캐릭터 빌드까지 섞으면
+  // 목록이 길어지는 데다, 골랐을 때 슬롯의 캐릭터까지 갈리는 게 예상 밖이다
+  // (그건 [가져오기]가 하는 일이고 창에 그렇게 적혀 있다).
   const share = make("div", { className: "art-share" },
-    make("span", { className: "name", textContent: "빌드 JSON" }));
+    make("span", { className: "name", textContent: "빌드" }));
+
+  const saved = savedBuildsFor(c.character);
+  const ssel = make("select");
+  ssel.add(new Option(saved.length ? "(저장된 빌드 불러오기)" : "(저장된 빌드 없음)", ""));
+  for (const e of saved) ssel.add(new Option(e.name, e.name));
+  // 방금 불러온/저장한 빌드가 지워졌을 수도 있으니 목록에 있을 때만 고른 상태로 둔다.
+  ssel.value = saved.some((e) => e.name === editorBuildName) ? editorBuildName : "";
+  ssel.disabled = !saved.length;
+  ssel.title = "저장해 둔 빌드를 이 슬롯에 불러옵니다";
+  ssel.onchange = () => { if (ssel.value) loadSavedBuild(ssel.value); };
+  share.append(ssel);
+
+  const save = make("button", { className: "mini", textContent: "저장" });
+  save.disabled = !storage();
+  save.title = save.disabled
+    ? "이 브라우저에서는 로컬 저장을 쓸 수 없습니다 (file:// 로 열었거나 시크릿 모드)"
+    : "지금 빌드에 이름을 붙여 이 브라우저에 저장한다";
+  save.onclick = () => saveCurrentBuild(c);
+  share.append(save);
+
+  // 지우는 대상은 드롭다운이 지금 가리키는 빌드다. 고른 게 없으면 잠가 둔다 —
+  // 무엇을 지우는지 모르는 채로 눌리는 삭제 버튼이 제일 나쁘다.
+  const del = make("button", { className: "mini", textContent: "삭제" });
+  del.disabled = !ssel.value;
+  del.title = ssel.value
+    ? `저장된 "${ssel.value}" 을(를) 지웁니다 (슬롯에 적용된 빌드는 그대로)`
+    : "지울 빌드를 드롭다운에서 먼저 고르세요";
+  del.onclick = () => deleteSavedBuild(ssel.value);
+  share.append(del);
+
   for (const [mode, label, title] of [
     ["export", "내보내기", "이 빌드를 JSON으로 복사한다"],
     ["import", "가져오기", "JSON을 붙여넣어 이 슬롯을 교체한다"],
@@ -388,7 +432,7 @@ function artifactEditor(c, slot) {
   setSel.onchange = () => {
     if (!setSel.value) { c.artifacts[slot.key] = null; }
     else if (a) { a.set = setSel.value; }
-    else { c.artifacts[slot.key] = blankArtifact(slot); }
+    else { c.artifacts[slot.key] = blankArtifact(slot, setSel.value); }
     structuralChange(!a || !setSel.value);   // 착탈이면 주옵·부옵 위젯이 생기거나 사라진다
   };
   hdr.append(setSel);
@@ -421,17 +465,155 @@ function artifactEditor(c, slot) {
   return box;
 }
 
-function blankArtifact(slot) {
+// 세트는 반드시 고른 값을 받는다. 기본값을 두면 (없음)에서 무언가를 고른 순간
+// 그 선택이 목록 첫 세트로 바뀌어 버린다 — 다시 그릴 때 드롭다운은 화면에 남은 값이
+// 아니라 여기서 만든 값을 읽기 때문이다.
+function blankArtifact(slot, set) {
   const main = (reg.validMainStats[slot.key] || ["HP"])[0];
   const pool = reg.validSubStats;
   return {
-    set: reg.artifactSets[0].id,
+    set,
     main: { stat: main, value: 0 },
     subs: [0, 1, 2, 3].map((i) => ({ stat: pool[i % pool.length], value: 0 })),
   };
 }
 
 const statLabel = (id) => (reg.statTypes.find((s) => s.id === id) || {}).label || id;
+
+// ── 저장된 빌드 (localStorage) ───────────────────────────────────────────
+// 저장하는 값은 [내보내기]가 뱉는 JSON 그대로에 이름표만 붙인 것이다. 저장·불러오기가
+// export_build/import_build 를 그대로 지나므로 세 가지가 공짜로 따라온다.
+//   · 깨진 빌드는 애초에 저장되지 않는다 (export_build 가 왕복하며 검증한다)
+//   · 저장된 것은 반드시 다시 읽힌다
+//   · 나중에 BUILD_VERSION 이 올라가도 import_build 가 항목별로 이유를 말해 준다
+//     — 목록 전체가 못 쓰게 되지 않는다
+// 그래서 저장 항목 하나를 그대로 복사해 [가져오기] 창에 붙여넣어도 동작한다.
+//
+// 키 하나에 전부 넣는다. 빌드마다 키를 쪼개면 목록을 만들 때 localStorage 전체를
+// 훑어야 하고 남의 키와 섞인다. 빌드 하나가 1~2KB라 수백 개가 5MB 안에 들어간다.
+const STORE_KEY = "gidc.builds.v1";
+
+// localStorage 는 file:// 이나 시크릿 모드에서 접근 자체가 던진다. 없으면 저장 UI만
+// 잠그고 나머지는 그대로 돈다 — 계산기는 저장 없이도 쓸 수 있어야 한다.
+function storage() {
+  try {
+    localStorage.getItem(STORE_KEY);
+    return localStorage;
+  } catch {
+    return null;
+  }
+}
+
+// 읽다 실패하면 조용히 날리지 않고 옆으로 치워 둔다 — 콘솔에서 건져낼 수 있어야 한다.
+// 치우지 않으면 다음 저장이 어차피 덮어써서 결과는 같고 흔적만 사라진다.
+function loadEntries() {
+  const ls = storage();
+  const raw = ls && ls.getItem(STORE_KEY);
+  if (!raw) return [];
+  try {
+    const data = JSON.parse(raw);
+    if (!Array.isArray(data.entries)) throw new Error("entries 가 없습니다");
+    return data.entries.filter((e) => e && e.name && e.character && e.payload);
+  } catch (e) {
+    try {
+      ls.setItem(STORE_KEY + ".broken", raw);
+      ls.removeItem(STORE_KEY);
+    } catch { /* 공간이 없으면 치우지도 못한다 — 그래도 목록은 비워 두고 계속 간다 */ }
+    console.error(`저장된 빌드를 읽지 못해 ${STORE_KEY}.broken 으로 옮겼습니다`, e);
+    return [];
+  }
+}
+
+function saveEntries(entries) {
+  const ls = storage();
+  if (!ls) throw new Error("이 브라우저에서는 로컬 저장을 쓸 수 없습니다.");
+  ls.setItem(STORE_KEY, JSON.stringify(
+    { format: "gidc.builds", version: 1, entries }, null, 2));
+}
+
+// 매번 읽는다. 캐시해 두면 다른 탭에서 저장한 빌드가 안 보인다 — 몇 KB 파싱이라
+// 편집 창을 다시 그릴 때마다 해도 티가 안 난다.
+const savedBuildsFor = (character) => loadEntries()
+  .filter((e) => e.character === character)
+  .sort((a, b) => a.name.localeCompare(b.name, "ko"));
+
+// 이름 짓기는 귀찮은 일이라 기본값을 준다. 같은 캐릭터의 빌드는 대개 무기로 갈리므로
+// 무기 이름을 쓰고, 이미 있으면 뒤에 번호를 붙인다.
+function defaultBuildName(c) {
+  const base = (c.weapon && c.weapon.name) || "빌드";
+  const taken = new Set(savedBuildsFor(c.character).map((e) => e.name));
+  if (!taken.has(base)) return base;
+  for (let i = 2; ; i++) if (!taken.has(`${base} ${i}`)) return `${base} ${i}`;
+}
+
+// 저장은 (캐릭터, 이름) 하나를 차지한다. 캐릭터는 지금 슬롯에서 이미 알고 있으니
+// 묻지 않고, 사용자가 대는 건 이름뿐이다.
+function saveCurrentBuild(c) {
+  let payload;
+  try {
+    payload = JSON.parse(api.export_build(c));      // 엔진 검증 + 정규화
+  } catch (e) {
+    alert("저장하지 못했습니다 — 빌드가 유효하지 않습니다.\n" + msgOf(e));
+    return;
+  }
+
+  const name = (prompt(`${c.character} 빌드를 어떤 이름으로 저장할까요?`,
+                       editorBuildName || defaultBuildName(c)) || "").trim();
+  if (!name) return;
+
+  const entries = loadEntries();
+  const at = entries.findIndex((e) => e.character === c.character && e.name === name);
+  if (at >= 0 && !confirm(`${c.character} "${name}" 을(를) 덮어씁니다. 계속할까요?`)) return;
+
+  const entry = { name, character: c.character, savedAt: new Date().toISOString(), payload };
+  if (at >= 0) entries[at] = entry; else entries.push(entry);
+
+  try {
+    saveEntries(entries);
+  } catch (e) {
+    alert("저장하지 못했습니다 — 저장 공간이 찼을 수 있습니다.\n" + msgOf(e));
+    return;
+  }
+  editorBuildName = name;
+  renderEditor();          // 드롭다운에 방금 저장한 이름이 잡히게
+}
+
+// 지우는 것은 저장 항목뿐이다 — 슬롯에 적용돼 있는 빌드는 건드리지 않는다.
+// 그래서 「이름을 잘못 지었다」가 [저장] 후 [삭제]로 해결된다. 되돌리기가 없으므로
+// 캐릭터와 이름을 확인 문구에 그대로 박아 무엇이 사라지는지 보이게 한다.
+function deleteSavedBuild(name) {
+  const c = party[editing];
+  if (!confirm(`저장된 ${c.character} "${name}" 을(를) 지웁니다.\n` +
+               `지금 슬롯에 적용된 빌드는 그대로 남습니다. 계속할까요?`)) return;
+
+  const entries = loadEntries()
+    .filter((e) => !(e.character === c.character && e.name === name));
+  try {
+    saveEntries(entries);
+  } catch (e) {
+    alert("지우지 못했습니다.\n" + msgOf(e));
+    return;
+  }
+  editorBuildName = null;
+  renderEditor();          // 드롭다운에서 사라지고 [삭제]가 다시 잠긴다
+}
+
+function loadSavedBuild(name) {
+  const entry = savedBuildsFor(party[editing].character).find((e) => e.name === name);
+  if (!entry) return;
+
+  const text = JSON.stringify(entry.payload, null, 2);
+  const out = applyBuildText(text, name);
+  if (out.ok) return;
+
+  // 저장할 땐 유효했어도 엔진에서 캐릭터·세트 이름이 바뀌면 깨질 수 있다. 그때는
+  // 저장된 JSON을 채운 채 [가져오기] 창을 열어 준다 — 이유가 그 자리에 보이고,
+  // 손으로 고쳐 적용할 수 있고, 오류를 띄울 자리를 편집 창에 새로 낼 필요도 없다.
+  renderEditor();          // 실패했으므로 드롭다운 선택을 되돌린다
+  openShare("import");
+  $("sharetext").value = text;
+  shareMsg(`저장된 "${name}" 을(를) 불러오지 못했습니다.\n` + out.message, "err");
+}
 
 // ── 빌드 JSON 주고받기 ───────────────────────────────────────────────────
 // 캐릭터 한 명분만 오간다. 파티 전체가 아닌 이유는 web_api.py 의 BUILD_FORMAT 주석 —
@@ -461,8 +643,7 @@ function openShare(mode) {
     try {
       ta.value = api.export_build(c);
     } catch (e) {
-      shareMsg("내보내지 못했습니다 — 빌드가 유효하지 않습니다.\n" +
-               (e && e.message ? e.message : String(e)), "err");
+      shareMsg("내보내지 못했습니다 — 빌드가 유효하지 않습니다.\n" + msgOf(e), "err");
     }
   }
 
@@ -477,27 +658,35 @@ function shareMsg(text, cls = "") {
   m.className = cls;
 }
 
+// 빌드 JSON 한 덩이를 지금 슬롯에 적용한다. 붙여넣기와 저장된 빌드 불러오기가 같은
+// 경로를 타야 검증도 오류 문구도 한 벌로 유지된다. 결과를 어디에 보여줄지는 부르는
+// 쪽이 정한다 — 붙여넣기는 창 안에, 불러오기는 창을 열어서.
+//
+// fromName 은 이 빌드가 어느 저장 항목에서 왔는지 (붙여넣기면 null — 출처를 모른다).
+function applyBuildText(text, fromName = null) {
+  if (editing === null) return { ok: false, message: "" };
+  let out;
+  try {
+    out = unwrap(api.import_build(text));
+  } catch (e) {
+    return { ok: false, message: "가져오기 실패:\n" + msgOf(e) };
+  }
+  if (out.errors.length) return { ok: false, message: out.errors.join("\n") };
+
+  party[editing] = out.build;
+  editorBuildName = fromName;
+  structuralChange(true);          // 캐릭터·무기가 바뀌면 위젯 구성 자체가 달라진다
+  return { ok: true, message: out.warnings.join("\n"), build: out.build };
+}
+
 // 오류면 창을 열어 둔 채 이유를 보여준다 — 붙여넣은 JSON이 남아 있어야 고칠 수 있다.
 // 경고(파티 JSON에서 한 명만 가져옴 등)는 적용은 하되 창을 닫지 않고 무엇이 빠졌는지 알린다.
 function applyShare() {
-  if (editing === null) return;
-  let out;
-  try {
-    out = unwrap(api.import_build($("sharetext").value));
-  } catch (e) {
-    shareMsg("가져오기 실패:\n" + (e && e.message ? e.message : String(e)), "err");
-    return;
-  }
-  if (out.errors.length) {
-    shareMsg(out.errors.join("\n"), "err");
-    return;
-  }
-
-  party[editing] = out.build;
-  structuralChange(true);          // 캐릭터·무기가 바뀌면 위젯 구성 자체가 달라진다
-
-  if (out.warnings.length) {
-    shareMsg(`${out.build.character} 빌드를 적용했습니다.\n` + out.warnings.join("\n"), "ok");
+  const out = applyBuildText($("sharetext").value);
+  if (!out.ok) {
+    shareMsg(out.message, "err");
+  } else if (out.message) {
+    shareMsg(`${out.build.character} 빌드를 적용했습니다.\n` + out.message, "ok");
   } else {
     $("share").close();
   }
@@ -604,19 +793,33 @@ const fmt = (v) => (typeof v === "number"
 const signed = (v) => (v > 0 ? "+" : "") + fmt(v);
 
 // onRow(tr, i) 는 데이터 행에만 불린다 (머리글 행은 건너뛴다).
-function table(node, headers, rows, onRow = null) {
-  node.innerHTML = "";
-  const tr = node.insertRow();
+// numFrom 부터의 열에 숫자 정렬(tabular-nums)을 준다 — 데미지 표는 첫 열이 히트 이름,
+// 둘째 열이 반응 버튼이라 셋째부터가 숫자다.
+function fillTable(t, headers, rows, onRow, numFrom) {
+  const tr = t.insertRow();
   headers.forEach((h) => tr.append(make("th", { textContent: h })));
   rows.forEach((row, i) => {
-    const r = node.insertRow();
+    const r = t.insertRow();
     row.forEach((c, j) => {
       const td = r.insertCell();
       if (typeof c === "string") td.textContent = c; else td.append(c);
-      if (j > 0) td.className = "num";
+      if (j >= numFrom) td.className = "num";
     });
     if (onRow) onRow(r, i);
   });
+}
+
+// 이미 있는 <table> 안에 그린다.
+function table(node, headers, rows, onRow = null, numFrom = 1) {
+  node.innerHTML = "";
+  fillTable(node, headers, rows, onRow, numFrom);
+}
+
+// 새 <table> 을 만들어 돌려준다 (캐릭터마다 표가 여러 개인 데미지 화면용).
+function buildTable(headers, rows, onRow = null, numFrom = 1) {
+  const t = make("table");
+  fillTable(t, headers, rows, onRow, numFrom);
+  return t;
 }
 
 function renderStats(stats) {
@@ -625,18 +828,61 @@ function renderStats(stats) {
                       pct(s.critRate), pct(s.critDmg), pct(s.energyRecharge)]));
 }
 
+// 캐릭터마다 블록 하나 — 그 캐릭터가 내는 피해가 히트든 반응이든 한자리에 모인다.
+// 격변을 히트와 같은 표에 섞지 않는 이유는 열의 의미가 달라서다: 계수도 %피해 보너스도
+// 안 타고, 반응 전용 치명타가 없으면 비크리와 크리가 같은 값이 된다.
 function renderDamage(damage) {
-  const multi = new Set(damage.map((d) => d.char)).size > 1;
-  table($("damage"), [multi ? "캐릭터 · 히트" : "히트", "비크리", "크리", "기댓값"],
-    damage.map((d) => [multi ? `${d.char} · ${d.hit}` : d.hit,
-                       num(d.nonCrit), num(d.crit), num(d.expected)]),
-    (tr, i) => {
-      tr.className = "hit";
-      tr.tabIndex = 0;
-      tr.title = "왜 이 데미지인지 보기";
-      tr.onclick = () => openExplain(damage[i].char, damage[i].hit);
-      tr.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); tr.onclick(); } };
-    });
+  const box = $("damage");
+  box.innerHTML = "";
+
+  for (const block of damage) {
+    box.append(make("div", { className: "dmg-char", textContent: block.char }));
+
+    box.append(buildTable(["히트", "반응", "비크리", "크리", "기댓값"],
+      block.hits.map((h) => [h.hit, reactionPicker(block.char, h),
+                             num(h.nonCrit), num(h.crit), num(h.expected)]),
+      (tr, i) => {
+        const open = () => openExplain(block.char, block.hits[i].hit);
+        tr.className = "hit";
+        tr.tabIndex = 0;
+        tr.title = "왜 이 데미지인지 보기";
+        // 반응 버튼은 행 클릭을 타고 올라가 설명 창까지 열지 않도록 막는다.
+        tr.onclick = (e) => { if (!e.target.closest("button")) open(); };
+        tr.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } };
+      }, 2));
+
+    if (!block.reactions.length) continue;
+
+    // 「1회당」인 이유: 로테이션에서 반응이 몇 번 터지는지는 이 계산기의 범위 밖이다.
+    box.append(make("div", { className: "dmg-sub", textContent: "반응 피해 (1회당)" }));
+    box.append(buildTable(["반응", "피해 원소", "비크리", "크리", "기댓값"],
+      block.reactions.map((r) => [r.label, r.element,
+                                  num(r.nonCrit), num(r.crit), num(r.expected)]),
+      null, 2));
+  }
+}
+
+// 이 히트에 붙일 수 있는 반응 버튼. 후보는 엔진이 히트 원소와 파티 구성에서 유도해 준다
+// — 얼음 히트에 증발을 고를 수 있으면 조용히 틀린 숫자가 나오기 때문이다.
+// 후보가 비어 오는 경우: 원소가 없는 히트(물리), 오라를 깔 파티원이 없음,
+// 히트가 반응을 내장함(이네파의 달감전 피해 — 골라도 안 바뀌므로 버튼을 내지 않는다).
+function reactionPicker(char, h) {
+  if (!h.candidates.length) return "";
+
+  const btn = (id, label) => {
+    const b = make("button", { type: "button", className: "mini", textContent: label });
+    if (h.reaction === id) b.classList.add("on");
+    b.onclick = () => {
+      if (!hitReactions[char]) hitReactions[char] = {};
+      hitReactions[char][h.hit] = id;
+      recalc();
+    };
+    return b;
+  };
+
+  const box = make("span", { className: "rx" }, btn("NONE", "무반응"));
+  for (const c of h.candidates) box.append(btn(c.id, c.label));
+  return box;
 }
 
 // ── 히트 설명 ────────────────────────────────────────────────────────────

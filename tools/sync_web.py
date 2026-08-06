@@ -7,8 +7,9 @@
 엔진을 고친 뒤 브라우저에 나타나기까지 손이 가는 일이 세 가지다. 이 스크립트가
 그 셋을 한 번에 한다.
 
-  1. 검사  — 별도 인터프리터로 gidc.web_api 를 임포트해 실제 페이지가 하는 일
-            (레지스트리 → 프리셋 → run_calculation)을 그대로 한 바퀴 돌린다.
+  1. 검사  — 별도 인터프리터로 gidc.web_api 를 임포트해 페이지가 하는 호출
+            (레지스트리 → 빌드시트 → run_calculation)을 그대로 한 바퀴 돌린다.
+            파티는 개발용 _presets/ 에서 가져온다 — 아래 CHECK_PARTY 주석 참고.
             깨진 엔진을 engine.zip 에 굽고 나서 Pyodide 콘솔에서 발견하는 것보다
             여기서 파이썬 트레이스백으로 보는 편이 훨씬 빠르다.
             실패하면 번들을 건드리지 않으므로 web/ 은 마지막으로 성공한 상태에 남는다.
@@ -42,45 +43,53 @@ WEB   = ROOT / "web"
 INDEX = WEB / "index.html"
 APPJS = WEB / "app.js"
 
-# app.js 안의 "폴더/이름" 문자열 리터럴 = 프리셋 id. 페이지가 부팅 때 쓰는 기본 파티라
-# 파이썬 쪽에서 프리셋 이름이 바뀌면 여기서 먼저 걸린다.
-PRESET_REF = re.compile(r'"([A-Za-z0-9_]+/[A-Za-z0-9_]+)"')
 # <script src="app.js?v=3"> — ?v= 가 아예 없는 형태도 받는다.
 APPJS_TAG  = re.compile(r'(src=")app\.js(?:\?v=[^"]*)?(")')
 
-# 페이지가 부팅 직후 실제로 쓰는 호출만 골라 한 바퀴 돈다. 별도 프로세스로 도는
-# 이유는 --watch 중에 이미 임포트된 낡은 모듈을 다시 쓰지 않기 위해서다.
+# 검사 파티. 페이지는 빈 파티로 뜨고 프리셋을 아예 모르지만(엔진에서 빠졌다), 검사는
+# 무기·성유물·명함이 다 박힌 캐릭터로 돌려야 값어치가 있다 — 맨몸 넷으로는 무기 패시브도
+# 성유물 세트 효과도 버프 상호작용도 한 번을 안 지난다. 그래서 개발용 _presets/ 를 쓴다.
+CHECK_PARTY = ["skirk_party/skirk", "skirk_party/furina",
+               "skirk_party/escoffier", "skirk_party/mona"]
+
+# 페이지가 쓰는 호출로 엔진을 한 바퀴 돈다. 별도 프로세스로 도는 이유는 --watch 중에
+# 이미 임포트된 낡은 모듈을 다시 쓰지 않기 위해서다.
 CHECK_SRC = r"""
 import json, sys
-from gidc.web_api import get_registries, preset_to_sheet, run_calculation
+from gidc.web_api import get_registries, char_to_spec, run_calculation
+from _presets import PRESET_REGISTRY, build_preset
 
-reg   = get_registries()
-known = {p["id"] for p in reg["presets"]}
+reg  = get_registries()
+refs = sys.argv[1:]
 
-refs    = sys.argv[1:]
-missing = [r for r in refs if r not in known]
+missing = [r for r in refs if r not in PRESET_REGISTRY]
 if missing:
-    sys.exit("app.js 가 참조하는 프리셋이 없습니다: " + ", ".join(missing))
+    sys.exit("검사 파티의 프리셋이 없습니다: " + ", ".join(missing))
 
-for name in sorted(known):          # 페이지가 안 쓰는 프리셋도 조립까지는 확인한다
-    preset_to_sheet(name)
+for name in sorted(PRESET_REGISTRY):   # 검사 파티에 없는 프리셋도 조립까지는 확인한다
+    char_to_spec(build_preset(name))
 
-party = [preset_to_sheet(r) for r in refs]
+party = [char_to_spec(build_preset(r)) for r in refs]
 out   = run_calculation({
     "party":    party,
     "enemy":    {"level": 100},
-    "settings": {"reaction": "NONE", "charLevel": 90, "targets": []},
+    "settings": {"charLevel": 90, "targets": []},
 })
 if out["errors"]:
     sys.exit("계산이 오류를 돌려줬습니다: " + json.dumps(out["errors"], ensure_ascii=False))
-if not out["damage"]:
+# damage는 캐릭터 블록이고 히트는 그 안에 있다 — 블록 수만 세면 전원의 히트가 통째로
+# 비어도 통과한다.
+hits      = sum(len(b["hits"]) for b in out["damage"])
+reactions = sum(len(b["reactions"]) for b in out["damage"])
+if not hits:
     sys.exit("히트가 하나도 안 나왔습니다 — 프로필 조립이 조용히 비었습니다.")
 
 print(json.dumps({
     "counts":    reg["counts"],
-    "presets":   len(known),
+    "presets":   len(PRESET_REGISTRY),
     "chars":     len(out["stats"]),
-    "hits":      len(out["damage"]),
+    "hits":      hits,
+    "reactions": reactions,
     "questions": len(out["questions"]),
     "pending":   len(out["pending"]),
 }, ensure_ascii=False))
@@ -90,9 +99,8 @@ print(json.dumps({
 # ── 1. 검사 ──────────────────────────────────────────────────────────────
 def check() -> dict | None:
     """엔진을 한 바퀴 돌려 본다. 성공하면 요약 dict, 실패하면 None(사유는 이미 출력)."""
-    refs = sorted(set(PRESET_REF.findall(APPJS.read_text(encoding="utf-8"))))
     proc = subprocess.run(
-        [sys.executable, "-c", CHECK_SRC, *refs],
+        [sys.executable, "-c", CHECK_SRC, *CHECK_PARTY],
         cwd=ROOT, capture_output=True, text=True,
         encoding="utf-8", errors="replace",
     )
@@ -106,7 +114,8 @@ def check() -> dict | None:
           f"무기 {summary['counts']['weapons']} / "
           f"성유물 {summary['counts']['artifactSets']}세트 · "
           f"프리셋 {summary['presets']}개")
-    print(f"         기본 파티 {summary['chars']}명 · 히트 {summary['hits']}개 · "
+    print(f"         검사 파티 {summary['chars']}명 · 히트 {summary['hits']}개 · "
+          f"반응 {summary['reactions']}개 · "
           f"질문 {summary['questions']}개(미답 {summary['pending']})")
     return summary
 

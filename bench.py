@@ -7,7 +7,7 @@
 import sys
 import unicodedata
 
-from gidc.presets.skirk_party import skirk, furina, escoffier, mona
+from _presets.skirk_party import skirk, furina, escoffier, mona
 from gidc.core.party import Party
 from gidc.core.enemy import Enemy
 from gidc.enums import DmgType, ReactionType

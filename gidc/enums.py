@@ -39,7 +39,7 @@ class MoonsignLevel(Enum):
 class ReactionType(Enum):
     NONE              = "없음"
     VAPORIZE          = "증발"
-    MELT              = "용해"
+    MELT              = "융해"
     OVERLOADED        = "과부하"
     SUPERCONDUCT      = "초전도"
     ELECTROCHARGED    = "감전"
