@@ -36,17 +36,19 @@ import json
 from datetime import datetime, timezone
 
 from gidc.core.artifact import _INVALID_SUB_STATS, _VALID_MAIN_STATS, MainStat, SubStat
+from gidc.core.character import Character
 from gidc.core import weapon_scaling
 from gidc.core.ascension import MAX_LEVEL, phases_for_level, resolve_phase
 from gidc.core.damage import calculate
 from gidc.core.enemy import Enemy
 from gidc.core.explain import (
     _CRIT_REACTION_FIELDS, _DECLARED_FIELDS, _DEFAULTS, _DMG_POOL_FIELDS, _STAT_TRIPLES,
-    explain_hit,
+    explain_hit, explain_transformative,
 )
 from gidc.core.party import Party
 from gidc.core.profile import (
-    build_damage_context, build_transformative_context, damage_input_fields, set_recording,
+    build_damage_context, build_transformative_context, damage_input_fields,
+    set_recording, transformative_input_fields,
 )
 from gidc.core.reaction import aura_pool, hit_candidates, transformative_candidates
 from gidc.enums import (
@@ -91,6 +93,8 @@ def get_registries() -> dict:
             str(lv): list(phases_for_level(lv)) for lv in range(1, MAX_LEVEL + 1)
         },
         "maxLevel":     MAX_LEVEL,
+        # 손으로 올릴 수 있는 특성 레벨의 상한. 명함 상승분은 이 위에 얹힌다.
+        "maxTalentLevel": Character.MAX_TALENT_LEVEL,
         # 무기 레벨 규칙은 성급으로 갈린다(1·2성만 Lv.70/4돌파에서 끝난다). 그래서
         # 캐릭터처럼 표 하나가 아니라 성급별로 나눠 넘긴다.
         "weaponLevels": _weapon_levels(),
@@ -107,19 +111,33 @@ def get_registries() -> dict:
 
 
 def _characters() -> list[dict]:
-    """캐릭터별 장착 가능 무기 종류와 획득 가능 특성. 전부 클래스 속성이라 인스턴스가 필요 없다."""
+    """캐릭터별 원소·성급·장착 가능 무기 종류와 획득 가능 특성.
+
+    element만 프로퍼티라 인스턴스가 필요하다(_weapons도 같은 이유로 하나 만든다).
+    빈 캐릭터를 만드는 것은 값싸고 부작용이 없다 — 패시브는 돌지 않는다."""
     out = []
     for name, cls in sorted(CHARACTER_REGISTRY.items()):
         out.append({
             "name":       name,
+            "element":    cls().element.value,
+            "rarity":     cls.rarity,
             "weaponType": cls.weapon_type.name if cls.weapon_type else None,
             "unlockableTraits": sorted(t.name for t in cls.unlockable_traits),
+            # 어느 명함이 어느 특성을 올리는가(0이면 안 올린다). 캐릭터마다 갈린다 —
+            # 모나는 C5가 스킬·C3가 폭발, 나비아는 그 반대다. 화면이 특성 입력 옆에
+            # 「+3」을 적으려면 이 표가 필요하고, 규칙을 JS가 베껴 두면 조용히 어긋난다.
+            "talentUp": {
+                "na":    cls.NA_LEVEL_UP_CONSTELLATION,
+                "skill": cls.SKILL_LEVEL_UP_CONSTELLATION,
+                "burst": cls.BURST_LEVEL_UP_CONSTELLATION,
+                "step":  cls.CONSTELLATION_LEVEL_UP,
+            },
         })
     return out
 
 
 def _weapons() -> list[dict]:
-    """무기 종류는 인스턴스 속성이라 정련 1로 한 번 만들어 읽는다(패시브는 돌지 않는다).
+    """무기 종류는 인스턴스 속성이라 재련 1로 한 번 만들어 읽는다(패시브는 돌지 않는다).
 
     baseAtk는 만렙 기준이고 **고를 때 알아보라고 보여주는 값**이라 게임 화면처럼
     반올림한다 — 계산에 쓰이는 것은 표에서 나온 소수(541.83…)다."""
@@ -395,7 +413,9 @@ def run_calculation(sheet, answers=None) -> dict:
         return _empty(errors)
 
     settings = sheet.get("settings") or {}
-    set_recording(bool(settings.get("explain")))
+    # 히트 설명이든 반응 설명이든 버프 기여 원장이 있어야 한다. 둘 다 아니면 끈다 —
+    # 기록은 계산을 느리게 만들고, 화면은 누를 때만 켠다.
+    set_recording(bool(settings.get("explain") or settings.get("explainReaction")))
 
     source = MappingSource(answers)
     try:
@@ -413,8 +433,8 @@ def run_calculation(sheet, answers=None) -> dict:
     return {
         "stats":   _stats(all_hits),
         "damage":  _damage(all_hits, enemy, members, hit_reactions, targets),
-        "explain": _explain(all_hits, enemy, members, hit_reactions,
-                            targets, settings.get("explain")),
+        "explain": _explain(all_hits, enemy, members, hit_reactions, targets,
+                            settings.get("explain"), settings.get("explainReaction")),
         "questions": [q.to_dict() for q in source.asked],
         "pending":   [q.id for q in source.pending],
         "stale":     source.stale,
@@ -569,18 +589,39 @@ _FORMULA_ORDER = [
     ("crit",                     "크리"),
     ("expected",                 "기댓값"),
 ]
+# 격변은 항의 역할이 뒤집힌다 — 반응 배율·레벨 배율·원마 보너스가 기초 피해에 곱해지는
+# 배율이 아니라 **기초 피해를 만드는 재료**다(_calc_transformative). 위 순서를 그대로 쓰면
+# 「기초 피해 5,349 → 반응 배율 2.75」로 찍혀 곱하면 안 되는 것을 곱하라고 읽힌다.
+# 실제로는 2.75 × 1446.85 × (1 + 0.3444) = 5,349 다. 라벨은 위 표를 그대로 쓰므로
+# 여기는 term 만 세운다.
+_FORMULA_ORDER_TRANSFORMATIVE = [
+    # ── 기초 피해 재료 ──
+    "reaction_mult", "lv_mult", "em_bonus", "reaction_bonus", "flat_dmg_bonus", "base_dmg",
+    # ── 여기에 곱해지는 배율 ──
+    "crit_mult", "res_mult",
+    # ── 결과 ──
+    "non_crit", "crit", "expected",
+]
+
 # (1+피해량증가) × 방어 × 내성을 한 번에 곱하려고 코드가 미리 뭉쳐 둔 중간값이다.
 # 게임 공식에 있는 항이 아니고, 곱해진 셋이 이미 따로 나오므로 화면에서는 뺀다.
 _FORMULA_HIDDEN = {"combined_mult"}
 _STAT_FIELDS = {f"{pre}_{tag}" for _, pre in _STAT_TRIPLES for tag in _STAT_PARTS}
 
 
-def _explain(all_hits, enemy, members, hit_reactions, targets, hit_name) -> dict | None:
+def _explain(all_hits, enemy, members, hit_reactions, targets,
+             hit_name, reaction_spec) -> dict | None:
     """버프 귀속. Explain은 이미 구조화돼 있어 그대로 편다 (to_text()는 쓰지 않는다).
 
     화면 구성(스탯 조립 / 보너스 풀 / 치명타·반응 / 공식)까지 여기서 짜 준다.
     어떤 필드가 어느 묶음인지는 explain.py가 이미 알고 있고, JS가 그 목록을
-    베껴 들고 있으면 필드가 늘 때마다 조용히 어긋난다."""
+    베껴 들고 있으면 필드가 늘 때마다 조용히 어긋난다.
+
+    설명 대상은 데미지 화면의 두 표에 하나씩 대응한다 — 히트 표는 hit_name(히트 이름),
+    반응 표는 reaction_spec({char, reaction, element})이다. 반응 쪽이 원소까지 받는 이유는
+    확산이 피해 원소별로 네 행이라 반응 이름만으로는 행이 특정되지 않기 때문이다."""
+    if reaction_spec:
+        return _explain_reaction(all_hits, enemy, members, targets, reaction_spec)
     if not hit_name:
         return None
     for char, hits in all_hits.items():
@@ -598,24 +639,90 @@ def _explain(all_hits, enemy, members, hit_reactions, targets, hit_name) -> dict
         # 이 히트가 실제로 읽는 필드. 나머지는 값이 붙어 있어도 이 숫자와 무관하다
         # — 화면은 그것을 접어 둔다.
         applied = damage_input_fields(hit, reaction_type=reaction)
-        return {
-            "char":    char.name,
-            "hit":     ex.name,
+        return _explain_payload(
+            ex, applied,
+            char = char.name,
+            kind = "hit",
             # 왜 어떤 보너스가 안 걸리는지는 결국 이 둘이 답이다(원소 없는 평타 = 물리).
-            "element":   (hit.element or Element.PHYSICAL).value,
-            "skillType": hit.skill_type.value,
-            "result":  {"nonCrit": ex.result.non_crit, "crit": ex.result.crit,
-                        "expected": ex.result.expected},
-            "stats":   _explain_stats(ex, applied),
-            "groups":  _explain_groups(ex, applied),
-            "formula": _explain_formula(ex.formula),
-        }
+            element    = (hit.element or Element.PHYSICAL).value,
+            skill_type = hit.skill_type.value,
+        )
     return None
 
 
-def _explain_formula(steps) -> list[dict]:
-    """공식 트레이스를 화면 순서로 세우고 한국어 이름을 붙인다 (원래 term도 같이 보낸다)."""
-    rank  = {term: i for i, (term, _) in enumerate(_FORMULA_ORDER)}
+def _explain_reaction(all_hits, enemy, members, targets, spec) -> dict | None:
+    """격변 반응 1회의 설명. 캐리어 히트 하나를 잡아 explain_transformative에 넘긴다.
+
+    _damage의 reaction_rows와 **같은 재료로 같은 숫자**가 나와야 한다 — 표에 없는 숫자를
+    설명하는 창이 제일 나쁘다. 그래서 캐리어도(첫 히트), 후보 유도도(파티 원소) 그쪽과 같다.
+    """
+    name    = spec.get("char")
+    reaction_name = spec.get("reaction")
+    element_value = spec.get("element")
+    if not (reaction_name and element_value):
+        return None
+
+    for char, hits in all_hits.items():
+        if targets and char.name not in targets:
+            continue
+        if name and char.name != name:
+            continue
+        carrier = next(iter(hits.values()), None)
+        if carrier is None:
+            continue
+
+        # 지금 이 파티에서 **실제로 가능한** 반응일 때만 설명한다. 히트 쪽
+        # _selected_reaction과 같은 이유다 — 파티를 바꿔 불가능해진 선택이 화면에 남아
+        # 있으면 조용히 틀린 숫자를 진짜인 양 설명하게 된다.
+        aura = aura_pool(members, char)
+        for reaction, element in transformative_candidates(char.element, aura):
+            if reaction.name != reaction_name or element.value != element_value:
+                continue
+            ex = explain_transformative(
+                carrier, enemy=enemy,
+                reaction=reaction, element=element, char_level=char.level,
+            )
+            applied = transformative_input_fields(reaction, element)
+            return _explain_payload(
+                ex, applied,
+                char = char.name,
+                kind = "reaction",
+                # 피해 원소는 반응이 정한다 — 캐리어의 원소가 아니다.
+                element    = element.value,
+                # 격변에 스킬 종류는 없다. 대신 버프 원장을 어느 히트에서 읽었는지 밝힌다
+                # — 스탯 시트가 아니라 히트에 걸린 값이라 출처를 감추면 안 된다.
+                skill_type = None,
+                carrier    = carrier.name,
+            )
+    return None
+
+
+def _explain_payload(ex, applied, *, char, kind, element, skill_type,
+                     carrier=None) -> dict:
+    """히트 설명과 반응 설명이 같은 모양을 내도록 묶는다 — 화면 렌더러가 하나뿐이다."""
+    order = _FORMULA_ORDER_TRANSFORMATIVE if kind == "reaction" else None
+    return {
+        "char":      char,
+        "kind":      kind,
+        "hit":       ex.name,
+        "element":   element,
+        "skillType": skill_type,
+        "carrier":   carrier,
+        "result":  {"nonCrit": ex.result.non_crit, "crit": ex.result.crit,
+                    "expected": ex.result.expected},
+        "stats":   _explain_stats(ex, applied),
+        "groups":  _explain_groups(ex, applied),
+        "formula": _explain_formula(ex.formula, order),
+    }
+
+
+def _explain_formula(steps, order=None) -> list[dict]:
+    """공식 트레이스를 화면 순서로 세우고 한국어 이름을 붙인다 (원래 term도 같이 보낸다).
+
+    order는 term 목록이며 비우면 직접 피해 순서(_FORMULA_ORDER)를 쓴다. 라벨은 언제나
+    _FORMULA_ORDER에서 온다 — 경로마다 순서는 달라도 같은 항은 같은 이름이어야 한다."""
+    terms = order if order is not None else [t for t, _ in _FORMULA_ORDER]
+    rank  = {term: i for i, term in enumerate(terms)}
     label = dict(_FORMULA_ORDER)
     kept  = [s for s in steps if s["term"] not in _FORMULA_HIDDEN]
     # 안정 정렬이라 모르는 term끼리는 계산 순서를 그대로 지킨 채 맨 뒤로 간다.

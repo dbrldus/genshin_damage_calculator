@@ -12,6 +12,7 @@ from gidc.enums import ArtifactSet
 from gidc.enums import CharacterTrait, Element
 from gidc.enums import StatType
 from gidc.enums import WeaponType
+from gidc.prompt import asking_for
 
 
 def clamp_talent_index(index: int, *tables: list) -> int:
@@ -64,6 +65,9 @@ class Character(ABC):
     ascension_stat: StatType | None = None
 
     # ── 특성 레벨 (서브클래스에서 선언) ────────────────────────────────────
+    # 손으로 올릴 수 있는 특성 레벨의 상한. 명함·고유 특성·파티발 상승은 이 위에
+    # 얹히므로 실효 레벨은 이보다 높을 수 있다(예: Lv.10 + 명함 +3 = 13).
+    MAX_TALENT_LEVEL: int = 10
     # 해당 특성의 레벨을 올리는 명함 번호. 0이면 명함으로 오르지 않는다.
     # 예) 모나는 C5가 원소전투 스킬을, C3가 원소폭발을 올린다.
     NA_LEVEL_UP_CONSTELLATION:    int = 0
@@ -130,7 +134,7 @@ class Character(ABC):
         up_constellation: int,
         tables:           tuple,
     ) -> int:
-        index = min(level, 10) - 1 + party_bonus + passive_bonus
+        index = min(level, self.MAX_TALENT_LEVEL) - 1 + party_bonus + passive_bonus
         if up_constellation and self.constellation >= up_constellation:
             index += self.CONSTELLATION_LEVEL_UP
         return clamp_talent_index(index, *tables) if tables else index
@@ -316,13 +320,16 @@ class Character(ABC):
             for art in self._iter_artifacts():
                 art.apply_raw_stats(hit)
 
+        # 세트 효과가 묻는 질문에 착용자를 달아 둔다 — 같은 세트를 두 명이 끼면
+        # 문구가 똑같아 화면에서 구분되지 않는다 (prompt.asking_for 참고).
         active_sets = self._get_active_sets()
         reps = self._get_set_representatives()
-        for artifact_set, tier in active_sets.items():
-            rep = reps[artifact_set]
-            rep.apply_2set(all_hits, self)
-            if tier == 4:
-                rep.apply_4set(all_hits, self)
+        with asking_for(self.name):
+            for artifact_set, tier in active_sets.items():
+                rep = reps[artifact_set]
+                rep.apply_2set(all_hits, self)
+                if tier == 4:
+                    rep.apply_4set(all_hits, self)
         if weapon:
             weapon.apply_passive(all_hits, self)
 
@@ -342,11 +349,12 @@ class Character(ABC):
 
         active_sets = self._get_active_sets()
         reps = self._get_set_representatives()
-        for artifact_set, tier in active_sets.items():
-            rep = reps[artifact_set]
-            rep.apply_2set_dependent(all_hits, self)
-            if tier == 4:
-                rep.apply_4set_dependent(all_hits, self)
+        with asking_for(self.name):
+            for artifact_set, tier in active_sets.items():
+                rep = reps[artifact_set]
+                rep.apply_2set_dependent(all_hits, self)
+                if tier == 4:
+                    rep.apply_4set_dependent(all_hits, self)
 
     def build_damage_profile(
         self,

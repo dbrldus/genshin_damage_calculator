@@ -32,10 +32,30 @@ class Question:
     options: tuple[str, ...] = ()
     min_val: int = 0
     max_val: int = 999
+    owner:   str = ""                 # 이 질문을 낳은 장비의 착용자 (asking_for 참고)
+
+    @property
+    def display_prompt(self) -> str:
+        """착용자를 앞머리 대괄호 **안에** 끼운다 — 「[스커크·진사 왕생록 4세트] …」.
+
+        문구는 관례상 [출처]로 시작하므로(성유물 세트·무기·캐릭터 전부) 그 안에 넣으면
+        「누구의 무엇」이 한 덩이로 읽힌다. 밖에 따로 붙이면 대괄호가 두 개 나란히 서서
+        어디까지가 출처인지 되레 흐려진다.
+
+        관례를 벗어난 문구(대괄호 없이 시작)는 앞에 [착용자]를 따로 세운다 — 문구를
+        건드리는 것보다 낫다. 조립을 여기서 하는 이유는, 이 관례를 아는 것이 문구를
+        가진 쪽(엔진)이지 화면이 아니기 때문이다."""
+        if not self.owner:
+            return self.prompt
+        if self.prompt.startswith("["):
+            return f"[{self.owner}·{self.prompt[1:]}"
+        return f"[{self.owner}] {self.prompt}"
 
     def to_dict(self) -> dict:
+        # prompt 는 착용자가 이미 접힌 표시용 문구다 — 화면이 다시 붙이지 않게
+        # owner 를 따로 내보내지 않는다.
         return {
-            "id": self.id, "kind": self.kind, "prompt": self.prompt,
+            "id": self.id, "kind": self.kind, "prompt": self.display_prompt,
             "options": list(self.options), "min": self.min_val, "max": self.max_val,
         }
 
@@ -155,6 +175,7 @@ class MappingSource(AnswerSource):
 _CONSOLE = ConsoleSource()
 _source:  ContextVar[AnswerSource]   = ContextVar("_source")
 _counter: ContextVar[dict[str, int]] = ContextVar("_counter")
+_owner:   ContextVar[str]            = ContextVar("_owner", default="")
 _fallback_counter: dict[str, int] = {}
 
 
@@ -168,6 +189,25 @@ def using(source: AnswerSource):
     finally:
         _source.reset(t_src)
         _counter.reset(t_cnt)
+
+
+@contextmanager
+def asking_for(name: str):
+    """이 블록 안에서 나오는 질문에 「누구 것인가」를 달아 둔다.
+
+    성유물 세트 효과의 문구는 세트 이름만 갖고 있어서(「[진사 왕생록 4세트] …」),
+    같은 세트를 두 명이 끼고 있으면 화면에 똑같은 질문이 두 개 뜨고 어느 쪽이
+    누구 것인지 알 수 없다. 문구를 착용자마다 다르게 만들 수는 없다 — 문구는
+    100여 개 세트 파일에 흩어져 있고, 질문 ID도 문구가 아니라 호출 지점으로 만든다.
+    그래서 문구는 그대로 두고 착용자만 Question.owner 로 얹어 UI가 붙여 그린다.
+
+    ID는 (호출 지점, 반복 횟수)라 여기에 영향받지 않는다 — 착용자가 바뀌어도
+    답변은 그대로 붙어 있다."""
+    token = _owner.set(name)
+    try:
+        yield
+    finally:
+        _owner.reset(token)
 
 
 def _next_id() -> str:
@@ -195,16 +235,18 @@ def _ask(q: Question):
 #  호출부가 쓰는 API — 시그니처 고정 (111곳이 이 이름을 부른다)
 # ══════════════════════════════════════════════════════════════════════════
 def ask_int(prompt: str, min_val: int = 0, max_val: int = 999) -> int:
-    return _ask(Question(_next_id(), "int", prompt, min_val=min_val, max_val=max_val))
+    return _ask(Question(_next_id(), "int", prompt,
+                         min_val=min_val, max_val=max_val, owner=_owner.get()))
 
 
 def ask_bool(prompt: str) -> bool:
-    return _ask(Question(_next_id(), "bool", prompt))
+    return _ask(Question(_next_id(), "bool", prompt, owner=_owner.get()))
 
 
 def ask_choice(prompt: str, options: list[str]) -> int:
     """선택한 항목의 인덱스(0-based)를 반환."""
-    return _ask(Question(_next_id(), "choice", prompt, options=tuple(options)))
+    return _ask(Question(_next_id(), "choice", prompt,
+                         options=tuple(options), owner=_owner.get()))
 
 
 def ask_multi_choice(prompt: str, options: list[str]) -> list[int]:
@@ -212,4 +254,5 @@ def ask_multi_choice(prompt: str, options: list[str]) -> list[int]:
 
     한 번의 조작으로 셋 이상을 고를 수 있어야 하는 효과(잿더미 세트처럼 반응 참여 원소가
     2개를 넘을 수 있는 경우)에 쓴다."""
-    return _ask(Question(_next_id(), "multi", prompt, options=tuple(options)))
+    return _ask(Question(_next_id(), "multi", prompt,
+                         options=tuple(options), owner=_owner.get()))

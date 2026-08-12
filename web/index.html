@@ -34,15 +34,110 @@
   @media (max-width:1000px) { .cols { grid-template-columns:1fr; } }
   .scroll { max-height:75vh; overflow:auto; }
 
-  /* 파티 편성 */
-  #party { display:flex; gap:.5rem; flex-wrap:wrap; align-items:stretch; margin-bottom:.5rem; }
+  /* 탭 — 왼쪽 칸에서 파티와 상황 질문이 자리를 나눠 쓴다 */
+  .tabs { display:flex; gap:.25rem; margin:1.5rem 0 .5rem; border-bottom:1px solid var(--line); }
+  /* 세로 여백은 h2 의 padding-bottom(.25rem)에 맞춰 잡는다 — 탭 줄과 오른쪽 칸의
+     제목이 같은 높이에서 시작해야 두 칸이 한 줄로 읽힌다. */
+  .tabs button { font:inherit; font-size:1rem; font-weight:600; color:var(--dim);
+                 padding:.2rem .7rem; margin-bottom:-1px; cursor:pointer;
+                 background:transparent; border:1px solid transparent; border-bottom:none;
+                 border-radius:6px 6px 0 0; }
+  .tabs button:hover { color:inherit; }
+  /* 고른 탭은 아래 테두리를 지워 패널과 한 몸으로 이어 붙인다 */
+  .tabs button[aria-selected="true"] { color:inherit; border-color:var(--line); background:Canvas; }
+  .tabs button .sub { font-weight:400; }
+  .tabpanel[hidden] { display:none; }
+  #qinfo { margin-bottom:.5rem; }
+
+  /* 파티 편성 — 카드를 세로로 쌓는다. 카드는 고정 폭 없이 탭 패널을 100% 채운다. */
+  #party { display:grid; gap:.5rem; container-type:inline-size; }
   #party .slot { border:1px solid var(--line); border-radius:6px; padding:.4rem .6rem;
                  font-size:.88rem; display:flex; flex-direction:column; gap:.3rem;
                  justify-content:center; }
-  #party .slot.on { border-color:currentColor; }
-  #party .slot .line { display:flex; gap:.35rem; align-items:center; }
-  #party .slot .sub { font-size:.78rem; }
+
+  /* ── 빌드 카드 ──────────────────────────────────────────────────────────
+     디자인 원본: Genshin Card Design/design_handoff_build_card/ (시안 1a「3행·밀집형」).
+     한 캐릭터가 **무엇을 끼웠는가**만 보여준다 — 계산된 스탯과 성유물 주/부옵션은
+     여기 넣지 않는다. 그건 빌드 편집 창과 스탯 표의 몫이다.
+     --ec(원소색)는 카드마다 app.js가 인라인으로 꽂는다. */
+  .bc { /* 치수 배율. 디자인의 1× 는 폭 380px 기준이라, 칸이 그보다 넓으면 그 비율만큼
+           같이 커진다(글자·아이콘·여백이 한 덩이로 움직여 모양이 안 흐트러진다).
+           칸이 380px 이하로 좁아지면 1px 에서 멈춘다 — 거기가 디자인의 1× 다. */
+        --u:clamp(1px, 100cqi / 380, 1.8px);
+        --bc-bg:light-dark(#fdfdfd,#191c1f); --bc-bg-hover:light-dark(#f4f5f6,#212529);
+        --bc-text:light-dark(#1b1c1e,#e7e8ea); --bc-dim:light-dark(#3a3b3d,#c9cacc);
+        --bc-muted:#8a8a8a;
+        --bc-border:light-dark(#00000020,#ffffff1f);
+        --bc-border-strong:light-dark(#00000030,#ffffff33);
+        --bc-border-soft:light-dark(#00000018,#ffffff18);
+        --bc-hairline:light-dark(#00000012,#ffffff12);
+        --bc-chip:light-dark(#00000010,#ffffff14);
+        --bc-slot:light-dark(#0000000a,#ffffff10);
+        --bc-ring:inset 0 0 0 1px light-dark(#00000014,#ffffff14);
+        --bc-ring-empty:inset 0 0 0 1px light-dark(#00000024,#ffffff2b);
+        padding:calc(9*var(--u)) calc(10*var(--u)); border:1px solid var(--bc-border);
+        border-radius:6px; background:var(--bc-bg); color:var(--bc-text); cursor:pointer;
+        transition:background .12s, border-color .12s; }
+  .bc:hover { background:var(--bc-bg-hover); border-color:var(--bc-border-strong); }
+  .bc:focus-visible { outline:2px solid var(--ec); outline-offset:1px; }
+  /* 선택됨 = 데미지 표에 넣기로 「골라 둔」 상태. 색만으로 알리지 않도록 왼쪽 액센트 바가 함께 온다 */
+  .bc.on { border-color:var(--ec); box-shadow:inset calc(3*var(--u)) 0 0 var(--ec); }
+
+  .bc .top { display:flex; align-items:flex-start; gap:calc(9*var(--u)); }
+  .bc .mid { flex:1; min-width:0; display:flex; flex-direction:column;
+             gap:calc(4*var(--u)); padding-top:calc(1*var(--u)); }
+  .bc .rowa { display:flex; align-items:center; gap:calc(6*var(--u)); min-width:0; }
+  .bc .nm { font-size:calc(13*var(--u)); font-weight:650; letter-spacing:-.01em;
+            white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .bc .tag { font:calc(10*var(--u))/1 ui-monospace,monospace; flex:none;
+             padding:calc(3*var(--u)) calc(4*var(--u)); border-radius:calc(3*var(--u));
+             color:var(--ec); background:color-mix(in srgb, var(--ec) 12%, transparent); }
+  .bc .con { font:600 calc(10*var(--u))/1 ui-monospace,monospace; flex:none;
+             padding:calc(3*var(--u)) calc(4*var(--u)); border-radius:calc(3*var(--u));
+             background:var(--bc-chip); color:var(--bc-dim); }
+  .bc .rowb { display:flex; align-items:center; gap:calc(8*var(--u)); flex-wrap:wrap;
+              font:calc(11*var(--u))/1 ui-monospace,monospace; color:var(--bc-muted); }
+  .bc .rowb .lv { color:var(--bc-dim); }
+  .bc .tal { display:inline-flex; align-items:baseline; gap:calc(3*var(--u)); }
+  .bc .tal .lb { color:var(--bc-muted); }
+  .bc .tal b { font:600 calc(11*var(--u))/1 ui-monospace,monospace; color:var(--bc-text); }
+  /* 명함으로 오른 특성 — 숫자 자체가 실효 레벨이고 ▲와 점선이 「손으로 올린 값이 아니다」를 말한다 */
+  .bc .tal b.up { color:var(--ec); text-decoration:underline dotted;
+                  text-underline-offset:calc(3*var(--u)); }
+  .bc .act { display:flex; gap:calc(2*var(--u)); flex:none; padding-top:calc(1*var(--u)); }
+  .bc .act button { font:calc(10*var(--u))/1 system-ui,sans-serif; border-radius:calc(4*var(--u));
+                    padding:calc(4*var(--u)) calc(5*var(--u));
+                    border:1px solid var(--bc-border-soft); background:transparent;
+                    color:var(--bc-muted); cursor:pointer; }
+  .bc .act button:hover { background:light-dark(#00000012,#ffffff18); color:var(--bc-text); }
+
+  .bc .gear { display:flex; align-items:center; gap:calc(7*var(--u));
+              padding-top:calc(7*var(--u)); margin-top:calc(1*var(--u));
+              border-top:1px solid var(--bc-hairline); }
+  .bc .gear .sep { width:1px; height:calc(16*var(--u)); background:var(--bc-border-soft); flex:none; }
+  .bc .gear .slots { display:flex; gap:calc(3*var(--u)); flex:none; }
+  .bc .gear .cnt,
+  .bc .gear .wlv { font:calc(10*var(--u))/1 ui-monospace,monospace; color:var(--bc-muted); flex:none; }
+  .bc .gear .sp { flex:1; }
+
+  /* 타일 — 아이콘이 못 와도 자리와 높이가 그대로여야 한다.
+     그래서 폴백 글자가 이미지 「뒤에」 늘 깔려 있고, 실패하면 이미지만 투명해진다. */
+  .bc .tile { position:relative; display:grid; place-items:center; flex:none;
+              overflow:hidden; border-radius:calc(4*var(--u)); box-shadow:var(--bc-ring); }
+  .bc .tile.empty { box-shadow:var(--bc-ring-empty); background:transparent; }
+  .bc .tile > span { position:absolute; color:var(--bc-muted);
+                     font:calc(9*var(--u))/1 ui-monospace,monospace; }
+  /* 그림이 온 칸은 폴백 글자를 감춘다 — 아이콘이 투명 PNG라 그냥 두면 뒤에서 비친다.
+     지우지 않고 감추기만 하는 이유: 그림이 나중에 실패하면 그대로 다시 드러나야 한다. */
+  .bc .tile.has-img > span { visibility:hidden; }
+  .bc .tile > img { display:block; width:100%; height:100%; object-fit:cover; position:relative; }
+  .bc .av { width:calc(40*var(--u)); height:calc(40*var(--u)); border-radius:calc(5*var(--u));
+            background:color-mix(in srgb, var(--ec) 12%, transparent); }
+  .bc .av > span { font-size:calc(14*var(--u)); font-weight:600; font-family:inherit; }
+  .bc .slot23 { width:calc(23*var(--u)); height:calc(23*var(--u)); background:var(--bc-slot); }
   #opts { display:flex; gap:1rem; align-items:center; flex-wrap:wrap; margin:.5rem 0; font-size:.88rem; }
+  /* 데미지 대상은 칩 여러 개라 이름표 글자와 한 줄로 서야 한다 */
+  #opts > .opt { display:flex; gap:.4rem; align-items:center; }
 
   /* 빌드 편집 창 */
   dialog { padding:0; border:1px solid var(--line); border-radius:10px; color:inherit;
@@ -105,6 +200,9 @@
   .ex-parts .rest { color:var(--warn); }        /* 원장에 안 잡힌 나머지 */
   .ex-sec .term { color:var(--dim); font-size:.8rem; margin-left:.45rem; }
   .ex-kind { color:var(--dim); font-size:.85rem; }
+  /* 격변 설명에서 스탯 조립·보너스 풀이 통째로 접히는 이유를 밝히는 줄 */
+  .ex-note { margin-top:.5rem; padding:.4rem .55rem; border-left:2px solid var(--line);
+             color:var(--dim); font-size:.8rem; line-height:1.45; }
   /* 이 히트에 안 걸리는 항목 — 지우지 않고 접어 둔다 */
   .ex-off { margin-top:.5rem; }
   .ex-off > summary { cursor:pointer; color:var(--dim); font-size:.8rem; }
@@ -112,18 +210,31 @@
   .ex-off .head { color:var(--dim); }
 
   /* 질문 */
-  .q { padding:.5rem .6rem; border:1px solid var(--line); border-radius:6px; margin-bottom:.4rem; }
+  .q { display:block; padding:.5rem .6rem; border:1px solid var(--line); border-radius:6px;
+       margin-bottom:.4rem; }
   .q.pending { border-color:var(--warn); }
-  .q > label { display:block; font-size:.88rem; margin-bottom:.3rem; }
+  .q > .qp { display:block; font-size:.88rem; margin-bottom:.3rem; }
   .q .badge { float:right; font-size:.72rem; color:var(--warn); margin-left:.4rem; }
+  /* 예/아니오 질문은 카드 전체가 체크박스의 라벨이다 */
+  .q.tap { cursor:pointer; }
+  .q.tap:not(.pending):hover { border-color:var(--dim); }   /* 미답 표시(주황 테두리)는 덮지 않는다 */
+  .q.tap:has(input:checked) { border-color:currentColor; background:#8881; }
 
-  /* 다중 선택 — 고른 것이 한눈에 보이도록 칩으로 편다 */
-  .q .multi { display:flex; gap:.35rem; flex-wrap:wrap; }
-  .q .chip { display:inline-flex; gap:.35rem; align-items:center; cursor:pointer;
-             padding:.2rem .6rem; font-size:.85rem;
-             border:1px solid var(--line); border-radius:999px; }
-  .q .chip:hover { border-color:var(--dim); }
-  .q .chip.on { border-color:currentColor; background:#8883; font-weight:600; }
+  /* 숫자 입력 — 최대치를 옆에 흐리게 적는다 (상황 질문은 [최대] 버튼도 단다) */
+  .numf { display:inline-flex; gap:.3rem; align-items:center; }
+  .numf .lim { color:var(--dim); font-size:.78rem; font-variant-numeric:tabular-nums; }
+  .numf .lim[title] { cursor:help; }
+  /* 명함으로 얹히는 특성 레벨(+3) — 상한과 달리 실제로 더해지는 값이라 흐리게 두지 않는다 */
+  .numf .bon { color:CanvasText; }
+
+  /* 다중 선택 — 고른 것이 한눈에 보이도록 칩으로 편다.
+     상황 질문 위젯과 데미지 대상 고르기가 같은 모양을 쓴다. */
+  .multi { display:flex; gap:.35rem; flex-wrap:wrap; }
+  .chip { display:inline-flex; gap:.35rem; align-items:center; cursor:pointer;
+          padding:.2rem .6rem; font-size:.85rem;
+          border:1px solid var(--line); border-radius:999px; }
+  .chip:hover { border-color:var(--dim); }
+  .chip.on { border-color:currentColor; background:#8883; font-weight:600; }
 </style>
 </head>
 <body>
@@ -139,18 +250,34 @@
 <div id="status">초기화 중…</div>
 <div id="errors"></div>
 
-<h2>파티 <span id="partycount" class="sub"></span></h2>
-<div id="party"></div>
 <div id="opts">
-  <label>데미지 대상 <select id="target"></select></label>
+  <!-- 칩 하나하나가 이미 <label>이라 이쪽은 <label>이면 안 된다 —
+       중첩되면 "데미지 대상" 글자를 눌렀을 때 첫 칩이 켜졌다 꺼진다. -->
+  <span class="opt">데미지 대상 <span id="targets" class="multi"></span></span>
   <label>적 레벨 <input id="enemylv" type="number" value="100" min="1" max="200"></label>
   <button id="reset" disabled>답변 초기화</button>
 </div>
 
 <div class="cols">
+  <!-- 왼쪽 칸은 파티와 상황 질문을 탭으로 겹쳐 쓴다. 둘 다 「입력」이고 오른쪽(스탯·데미지)이
+       그 결과라, 세로로 늘어놓으면 결과가 화면 밖으로 밀린다. -->
   <div>
-    <h2>상황 질문 <span id="qcount" class="sub"></span></h2>
-    <div id="questions" class="scroll"></div>
+    <div class="tabs" role="tablist" aria-label="입력">
+      <button type="button" id="tabbtn-party" role="tab" aria-controls="tab-party"
+              aria-selected="true">파티 <span id="partycount" class="sub"></span></button>
+      <button type="button" id="tabbtn-questions" role="tab" aria-controls="tab-questions"
+              aria-selected="false">상황 질문 <span id="qcount" class="sub"></span></button>
+    </div>
+
+    <section id="tab-party" class="tabpanel scroll" role="tabpanel" aria-labelledby="tabbtn-party">
+      <div id="party"></div>
+    </section>
+
+    <section id="tab-questions" class="tabpanel scroll" role="tabpanel"
+             aria-labelledby="tabbtn-questions" hidden>
+      <div id="qinfo" class="sub"></div>
+      <div id="questions"></div>
+    </section>
   </div>
   <div>
     <h2>스탯 시트</h2>
@@ -196,6 +323,6 @@
 <!-- ?v= 는 캐시 무효화용 app.js 내용 해시. 손으로 고치지 않는다 —
      python tools/sync_web.py 가 저장할 때마다 다시 계산해 넣는다.
      (python -m http.server 는 Cache-Control 을 안 붙여서 브라우저가 옛 파일을 계속 쓴다) -->
-<script src="app.js?v=6b759658"></script>
+<script src="app.js?v=36ac0fe3"></script>
 </body>
 </html>

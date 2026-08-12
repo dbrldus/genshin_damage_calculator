@@ -21,13 +21,18 @@ const MAX_PARTY = 4;
 
 let api = null;
 let reg = null;           // get_registries() 결과
+let icons = null;         // icons.json — 한글 이름 → 게임 아이콘 파일명 (tools/build_icon_map.py)
 let party = [];           // 빌드시트 spec 배열
 let answers = {};
 // 히트별 상황 반응 — { 캐릭터명: { 히트명: "VAPORIZE" } }.
 // 파티가 바뀌어 불가능해진 선택은 엔진이 무반응으로 되돌려 보내므로(_selected_reaction)
 // 여기서 지우지 않는다. 버튼의 눌림 상태는 저장값이 아니라 엔진이 되돌려준 값으로 그린다.
 let hitReactions = {};
-let target = "";
+// 데미지 표에 보일 캐릭터. null = 아직 손대지 않음 = 파티 전원(파티원이 늘면 같이 는다).
+// 칩을 한 번이라도 건드리면 Set 으로 굳고, 그 뒤로는 새 파티원이 저절로 끼어들지 않는다 —
+// 딜러 둘을 나란히 보려고 골라 뒀는데 버퍼를 넣었다고 표가 흔들리면 곤란하다.
+// 빈 Set 은 「전원」이 아니라 「아무도 안 봄」이다. 엔진의 빈 targets 와 뜻이 다르다.
+let dmgTargets = null;
 let enemyLevel = 100;
 let editing = null;       // 빌드 창이 열려 있는 파티 인덱스 (닫혀 있으면 null)
 // 지금 편집 중인 슬롯이 어느 저장 빌드에서 왔는가 (드롭다운의 선택 표시 + 저장할 때
@@ -40,6 +45,43 @@ function make(tag, props = {}, ...kids) {
   Object.assign(n, props);
   for (const k of kids) n.append(k);
   return n;
+}
+
+// 숫자 입력에 「어디까지 넣을 수 있는가」를 붙인다. 상한이 input의 max 속성에만
+// 있으면 화면에 안 보여서, 넘겨 친 뒤에야(혹은 조용히 잘린 뒤에야) 알게 된다.
+//
+// button: [최대] 버튼을 단다. 값을 넣고 입력의 change 이벤트를 그대로 태우므로
+//   반영 경로가 둘로 갈리지 않는다 — 부르는 쪽은 onchange만 달아 두면 된다.
+//   상황 질문처럼 상한이 매번 다른(그래서 최대치가 얼마인지도 모르는) 입력에만 준다.
+// bonus: 상한 위에 얹히는 몫(명함 특성 상승 +3). 상자의 max를 13으로 올리지 않는
+//   이유는, 그러면 10과 13이 똑같은 결과를 내는 두 입력이 되어 무엇이 참인지 알 수
+//   없게 되기 때문이다. 손으로 올리는 값은 10까지고, 나머지는 엔진이 더한다.
+function numField(input, max, { min = null, button = false, bonus = 0, bonusFrom = "" } = {}) {
+  input.max = max;
+  if (min !== null) input.min = min;
+
+  // 상한은 「+3/13」처럼 한 덩이로 적는다 — 얹히는 몫과 그래서 얼마가 되는지가
+  // 나란히 붙어 있어야 읽힌다. 얹히는 몫이 없으면 그냥 「/10」이다.
+  const lim = make("span", { className: "lim" });
+  if (bonus) {
+    lim.title = `기본 ${max} + ${bonusFrom}의 +${bonus} = 실효 최대 ${max + bonus} ` +
+                `(손으로 올리는 값은 ${max}까지 — 나머지는 엔진이 더한다)`;
+    lim.append(make("span", { className: "bon", textContent: `+${bonus}` }));
+  }
+  lim.append(min === null ? `/${max + bonus}` : `${min}~${max}`);
+  const box = make("span", { className: "numf" }, input, lim);
+
+  if (button) {
+    const btn = make("button", { type: "button", className: "mini", textContent: "최대",
+                                 title: `최대치 ${max} 를 채웁니다` });
+    btn.disabled = input.disabled;
+    btn.onclick = () => {
+      input.value = max;
+      input.dispatchEvent(new Event("change"));
+    };
+    box.append(btn);
+  }
+  return box;
 }
 
 function opt(list, value, getVal = (x) => x, getLabel = (x) => x) {
@@ -57,9 +99,20 @@ function sheet(extra = {}) {
     // 캐릭터 레벨은 여기서 보내지 않는다 — 방어력/반응 레벨 배율은 때리는 캐릭터
     // 자신의 레벨로 정해지므로 엔진이 party[i].level 을 직접 읽는다. 하나로 뭉치면
     // 레벨이 섞인 파티에서 틀리고, Lv.80 을 90 으로 계산하면 피해가 2.78% 부풀려진다.
-    settings: { hitReactions, targets: target ? [target] : [], ...extra },
+    settings: { hitReactions, targets: selectedTargets(), ...extra },
   };
 }
+
+// 지금 고른 대상 — 손대지 않았으면(null) 파티 전원으로 편다. 엔진에는 이렇게 편 목록을
+// 보낸다. 일부만 골랐을 때 나머지 캐릭터의 히트 평가를 엔진이 실제로 건너뛰게 하려면
+// 「빈 목록 = 전원」에 기대지 말고 이름을 다 적어 보내야 한다.
+function selectedTargets() {
+  return partyNames().filter((n) => !dmgTargets || dmgTargets.has(n));
+}
+
+// 이름으로 접은 파티. 같은 캐릭터를 두 슬롯에 넣어도 대상으로서는 한 사람이다 —
+// 엔진도 targets 를 이름으로 거른다(_damage).
+const partyNames = () => [...new Set(party.map((c) => c.character))];
 
 // PyProxy -> 순수 JS 객체. 파이썬 dict를 JS 객체로 바꾸고 프록시는 즉시 해제한다.
 function unwrap(proxy) {
@@ -79,7 +132,7 @@ function fail(what, e) {
 async function boot() {
   const t0 = performance.now();
   try {
-    status_.textContent = "Pyodide 런타임 내려받는 중… (최초 1회, 이후 캐시)";
+    status_.textContent = "Pyodide 런타임 내려받는 중…";
     const py = await loadPyodide();
 
     const tRuntime = performance.now();
@@ -90,6 +143,10 @@ async function boot() {
     status_.textContent = "엔진 임포트 중…";
     api = py.pyimport("gidc.web_api");
     reg = unwrap(api.get_registries());
+
+    // 아이콘 맵은 그림이 아니라 파일명 표(15KB)다. 없어도 계산은 그대로 돌아가고
+    // 카드가 글자 폴백으로 뜰 뿐이라, 실패해도 초기화를 멈추지 않는다.
+    icons = await fetch("icons.json").then((r) => (r.ok ? r.json() : null)).catch(() => null);
 
     // 빈 파티로 시작한다. 예시 조합을 깔아 두면 내 파티를 짜기 전에 남의 빌드를 먼저
     // 지워야 하고, 화면의 숫자가 내 것인지 예시인지 헷갈린다.
@@ -127,22 +184,45 @@ function renderAll() {
   recalc();
 }
 
+// ── 왼쪽 탭 ──────────────────────────────────────────────────────────────
+// 파티와 상황 질문은 둘 다 「입력」이고 오른쪽 칸(스탯·데미지)이 그 결과다.
+// 세로로 늘어놓으면 답을 보려고 계속 스크롤하게 되므로 한 자리를 나눠 쓴다.
+// 탭을 저절로 바꾸지는 않는다 — 계산할 때마다 화면이 옮겨 다니면 편집하던 자리를 잃는다.
+const TABS = ["party", "questions"];
+
+function showTab(name) {
+  for (const t of TABS) {
+    const on = t === name;
+    const btn = $(`tabbtn-${t}`);
+    btn.setAttribute("aria-selected", on ? "true" : "false");
+    // 고르지 않은 탭은 Tab 키 순회에서 빼 둔다 — 탭 사이는 화살표로 옮기는 것이 관례다.
+    btn.tabIndex = on ? 0 : -1;
+    $(`tab-${t}`).hidden = !on;
+  }
+}
+
+function wireTabs() {
+  TABS.forEach((name, i) => {
+    const btn = $(`tabbtn-${name}`);
+    btn.onclick = () => showTab(name);
+    btn.onkeydown = (e) => {
+      const step = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+      if (!step) return;
+      e.preventDefault();
+      const next = TABS[(i + step + TABS.length) % TABS.length];
+      showTab(next);
+      $(`tabbtn-${next}`).focus();
+    };
+  });
+  showTab("party");
+}
+
 // ── 파티 ─────────────────────────────────────────────────────────────────
 function renderParty() {
   const box = $("party");
   box.innerHTML = "";
 
-  party.forEach((c, i) => {
-    const sel = opt(reg.characters, c.character, (x) => x.name, (x) => x.name);
-    sel.onchange = () => { swapCharacter(i, sel.value); };
-    const edit = make("button", { className: "mini", textContent: "빌드", title: "빌드 편집" });
-    edit.onclick = () => openEditor(i);
-    const del = make("button", { className: "mini", textContent: "✕", title: "제외" });
-    del.onclick = () => { closeEditor(); party.splice(i, 1); structuralChange(); };
-    box.append(make("div", { className: "slot on" },
-      make("div", { className: "line" }, sel, edit, del),
-      make("div", { className: "line sub", textContent: slotSummary(c) })));
-  });
+  party.forEach((c, i) => box.append(buildCard(c, i)));
 
   // 추가하는 캐릭터는 맨몸으로 들어온다 — 무기도 성유물도 없는 기본 스펙.
   // 프리셋으로 넣으면 남이 짜 둔 빌드가 딸려 와서, 내 빌드를 넣으려면 먼저 지워야 한다.
@@ -159,33 +239,218 @@ function renderParty() {
     box.append(make("div", { className: "slot" }, add));
   }
 
-  $("partycount").textContent = `— ${party.length}/${MAX_PARTY}명`;
+  // 탭 이름 옆에 붙는 값이라 짧게 — 자세한 것은 각 패널 안에서 말한다.
+  $("partycount").textContent = `${party.length}/${MAX_PARTY}`;
 
-  const sel = $("target");
-  sel.innerHTML = "";
-  sel.add(new Option("전원", ""));
-  for (const c of party) sel.add(new Option(c.character, c.character));
-  if (![...sel.options].some((o) => o.value === target)) target = "";
-  sel.value = target;
+  renderTargets();
 }
 
-function slotSummary(c) {
-  const arts = Object.values(c.artifacts || {}).filter(Boolean).length;
-  // 상한 레벨은 같은 Lv 표기로 두 상태가 존재하므로 돌파를 함께 적는다 —
-  // 파티 카드만 보고 Lv80 5돌파와 Lv80 6돌파를 구분할 수 있어야 한다.
-  const forked = (reg.ascensionPhases[c.level] || []).length > 1;
-  const lv = `Lv${c.level}` + (forked ? `·${c.ascension}돌파` : "");
-  return `${lv} C${c.constellation} · ${weaponSummary(c.weapon)} · 성유물 ${arts}/5`;
+// 데미지 대상 칩. 상황 질문의 다중 선택 위젯(widget)과 같은 모양을 쓴다 —
+// <select multiple>을 안 쓰는 이유는 거기 적어 두었다.
+function renderTargets() {
+  const box = $("targets");
+  box.innerHTML = "";
+
+  // 파티에서 빠진 사람은 선택에서도 지운다. 손대지 않은 상태(null)는 그대로 둔다 —
+  // 여기서 Set 으로 굳혀 버리면 그 뒤에 추가한 캐릭터가 표에 안 나온다.
+  if (dmgTargets) {
+    const alive = new Set(partyNames());
+    for (const n of [...dmgTargets]) if (!alive.has(n)) dmgTargets.delete(n);
+  }
+
+  const picked = new Set(selectedTargets());
+  for (const name of partyNames()) {
+    const cb = make("input", { type: "checkbox", checked: picked.has(name) });
+    const chip = make("label", { className: "chip" + (picked.has(name) ? " on" : "") },
+                      cb, make("span", { textContent: name }));
+    cb.onchange = () => {
+      // 첫 클릭에서 「전원」이 명시적인 목록으로 굳는다.
+      if (!dmgTargets) dmgTargets = new Set(partyNames());
+      if (cb.checked) dmgTargets.add(name); else dmgTargets.delete(name);
+      chip.classList.toggle("on", cb.checked);
+      syncCardSelection();
+      recalc();          // 대상 바꾸기는 구조 변경이 아니다 — 답변을 날리지 않는다
+    };
+    box.append(chip);
+  }
 }
 
-// 무기는 만렙이 기본이라 그때는 레벨을 적지 않는다 — 늘 붙어 있으면 눈에 안 들어와서,
-// 정작 만렙이 아닌 무기를 끼웠을 때 알아채지 못한다.
-function weaponSummary(w) {
-  if (!w) return "무기 없음";
-  const rule = weaponRule(w.name);
-  if (w.level == null || w.level === rule.maxLevel) return w.name;
-  const forked = (rule.phases[w.level] || []).length > 1;
-  return `${w.name} Lv${w.level}` + (forked ? `·${w.ascension}돌파` : "");
+// 카드의 선택 표시와 데미지 대상은 같은 상태를 본다. 칩을 눌렀을 때 파티를 통째로
+// 다시 그리면 방금 누른 칩이 포커스를 잃으므로, 표시만 갈아 준다.
+function syncCardSelection() {
+  $("party").querySelectorAll(".bc").forEach((el, i) => {
+    const on = !!(dmgTargets && party[i] && dmgTargets.has(party[i].character));
+    el.classList.toggle("on", on);
+    el.setAttribute("aria-selected", on ? "true" : "false");
+  });
+}
+
+// ── 빌드 카드 ───────────────────────────────────────────────────────────
+// 디자인 원본: Genshin Card Design/design_handoff_build_card/ (시안 1a). 모양·치수·상태는
+// 그 README 가 확정값이고 여기서는 그대로 옮긴다. 카드가 말하는 것은 「무엇을 끼웠는가」
+// 뿐이다 — 계산된 스탯과 성유물 주/부옵션은 넣지 않는다.
+const SLOT_ORDER = [
+  ["flower",  "꽃",   "꽃"],
+  ["feather", "깃털", "깃"],
+  ["sands",   "시계", "시"],
+  ["goblet",  "성배", "잔"],
+  ["circlet", "왕관", "관"],
+];
+
+const ELEMENT_COLOR = {
+  불: "#d9603f", 물: "#3f8fd9", 얼음: "#3aa9c4", 번개: "#9a6fd0",
+  바람: "#3fb094", 바위: "#c1922c", 풀: "#5da33f",
+};
+
+// 아이콘은 우리 서버를 거치지 않는다 — 브라우저가 CDN 에서 직접 받는다.
+// yatta 쪽이 파일이 2.5배 작아 1순위고(21KB 대 41KB), 실패하면 enka 로 한 번 갈아탄다.
+// 성유물만 yatta 에서 하위 경로에 있다 (enka 는 전부 평면).
+const ICON_URL  = "https://gi.yatta.moe/assets/UI/";
+const RELIC_URL = ICON_URL + "reliquary/";
+const ICON_ALT  = "https://enka.network/ui/";
+
+function iconOf(kind, name, slot) {
+  const entry = icons && icons[kind] && icons[kind][name];
+  const key = kind === "artifacts" ? entry && entry[slot] : entry;
+  if (!key) return null;
+  return { url: (kind === "artifacts" ? RELIC_URL : ICON_URL) + key + ".png",
+           alt: ICON_ALT + key + ".png" };
+}
+
+function buildCard(c, i) {
+  const meta = reg.characters.find((x) => x.name === c.character) || {};
+  const card = make("div", { className: "bc", tabIndex: 0, role: "button" });
+  card.style.setProperty("--ec", ELEMENT_COLOR[meta.element] || "#8a8a8a");
+
+  // 데미지 대상을 「골라 둔」 상태에서만 선택 표시를 켠다. 손대지 않았을 때(=전원)
+  // 네 장이 전부 원소색을 두르면 표시가 아무것도 구분해 주지 못한다.
+  const picked = dmgTargets && dmgTargets.has(c.character);
+  card.classList.toggle("on", !!picked);
+  card.setAttribute("aria-selected", picked ? "true" : "false");
+
+  card.append(cardTop(c, i, meta), cardGear(c));
+
+  // 카드 전체가 빌드 편집 히트영역이다. 액션 버튼은 자기 클릭을 여기까지 올리지 않는다.
+  card.onclick = () => openEditor(i);
+  card.onkeydown = (e) => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openEditor(i); }
+  };
+  return card;
+}
+
+function cardTop(c, i, meta) {
+  const name = make("span", { className: "nm", textContent: c.character, title: c.character });
+  const rowA = make("div", { className: "rowa" }, name);
+  if (meta.element) rowA.append(make("span", { className: "tag", textContent: meta.element }));
+  rowA.append(make("span", { className: "con", textContent: `C${c.constellation}`,
+                             title: `운명의 자리 ${c.constellation}` }));
+
+  const rowB = make("div", { className: "rowb" },
+    make("span", { className: "lv", textContent: `Lv.${c.level}` }));
+  for (const t of talents(c, meta)) {
+    rowB.append(make("span", { className: "tal", title: t.title },
+      make("span", { className: "lb", textContent: t.label }),
+      make("b", { className: t.bonus ? "up" : "", textContent: t.text })));
+  }
+
+  const act = make("div", { className: "act" });
+  for (const [label, title, fn] of [
+    ["편집", "빌드 편집", () => openEditor(i)],
+    ["삭제", "파티에서 제외", () => { closeEditor(); party.splice(i, 1); structuralChange(); }],
+  ]) {
+    const b = make("button", { type: "button", textContent: label, title });
+    b.onclick = (e) => { e.stopPropagation(); fn(); };
+    act.append(b);
+  }
+
+  return make("div", { className: "top" },
+    tile("av", c.character.slice(0, 1), iconOf("characters", c.character), c.character),
+    make("div", { className: "mid" }, rowA, rowB), act);
+}
+
+// 특성 셋. 명함으로 오르는 특성은 실효 레벨을 적고, 손으로 올린 값은 title 로 남긴다 —
+// 상승 폭과 어느 명함이 올렸는지는 캐릭터마다 다르므로(모나는 C5가 스킬, 나비아는 반대)
+// 규칙을 여기 베끼지 않고 엔진이 준 talentUp 표만 읽는다.
+function talents(c, meta) {
+  const up = meta.talentUp || {};
+  return [
+    ["평", "일반 공격",      c.naLevel,    up.na],
+    ["E",  "원소전투 스킬",  c.skillLevel, up.skill],
+    ["Q",  "원소폭발",       c.burstLevel, up.burst],
+  ].map(([label, full, base, cno]) => {
+    const bonus = cno && c.constellation >= cno ? (up.step || 0) : 0;
+    return {
+      label, bonus,
+      text: bonus ? `${base + bonus}▲` : String(base),
+      title: bonus
+        ? `${full}: 손 ${base} + C${cno} 명함 +${bonus} = 실효 ${base + bonus}`
+        : `${full}: ${base}`,
+    };
+  });
+}
+
+// 장비 행 — 무기와 성유물 5부위. 이름은 어느 것도 글자로 적지 않는다(툴팁에만).
+// 한글 이름은 길이 편차가 커서(「판정」~「위대한 사막 현자의 대답」) 글자로 적으면
+// 폭이 흔들리거나 잘려서 「페보니우스 검」과 「페보니우스 비전」이 같아진다.
+function cardGear(c) {
+  const w = c.weapon;
+  const gear = make("div", { className: "gear" },
+    tile("slot23", w ? w.name.slice(0, 1) : "무", w && iconOf("weapons", w.name),
+         w ? `무기 — ${w.name} · R${w.refinement} · Lv.${w.level}` : "무기 — 비어 있음", !w),
+    make("span", { className: "wlv", textContent: w ? `Lv.${w.level}·R${w.refinement}` : "" }),
+    make("span", { className: "sep" }));
+
+  const arts = c.artifacts || {};
+  const slots = make("span", { className: "slots" });
+  let filled = 0;
+  for (const [key, label, short] of SLOT_ORDER) {
+    const set = arts[key] && setLabel(arts[key].set);
+    if (set) filled += 1;
+    slots.append(tile("slot23", short, set && iconOf("artifacts", set, label),
+                      set ? `${label} — ${set}` : `${label} — 비어 있음`, !set));
+  }
+  gear.append(slots,
+    make("span", { className: "cnt", textContent: `${filled}/5`, title: `성유물 ${filled}/5 부위` }),
+    make("span", { className: "sp" }));
+  return gear;
+}
+
+// 폴백 글자를 이미지 뒤에 깔고 그 위에 이미지를 얹는다. 아이콘이 없거나(맵에 키가 없다)
+// 못 받아도 타일의 크기와 글자는 남는다.
+function tile(cls, fallback, src, title, empty = false) {
+  // 폴백 글자는 눈으로 볼 때만 쓰는 것이다 — 읽어 주는 쪽에는 title 에 온전한 이름이
+  // 있으므로, 여기까지 읽으면 「에 에스코피에」처럼 앞글자가 덧붙는다.
+  const fb = make("span", { textContent: fallback });
+  fb.setAttribute("aria-hidden", "true");
+  const t = make("span", { className: `tile ${cls}${empty ? " empty" : ""}` }, fb);
+  if (title) t.title = title;
+  if (src) {
+    const img = make("img", { alt: "", loading: "lazy", decoding: "async" });
+    img.dataset.alt = src.alt;
+
+    // 아이콘은 배경이 뚫린 PNG 라, 그림이 온 뒤에도 글자를 그대로 두면 뒤에서 비쳐 보인다.
+    // 그래서 뜬 순간 글자를 감추고, 못 받으면 다시 드러낸다.
+    img.onload = () => t.classList.add("has-img");
+    // CDN 이 죽어도 카드가 무너지지 않게 — 한 번은 다른 CDN 으로 갈아타 보고,
+    // 그것도 실패하면 이미지만 투명해져 글자가 남는다(높이 변화 0).
+    img.onerror = () => {
+      t.classList.remove("has-img");
+      if (img.dataset.alt) { img.src = img.dataset.alt; img.dataset.alt = ""; return; }
+      img.style.opacity = 0;
+    };
+    // src 는 핸들러를 단 뒤에 준다 — 캐시에 있는 그림은 붙이자마자 끝나 버려서,
+    // 순서가 뒤바뀌면 load 를 놓치고 글자가 계속 남는다.
+    img.src = src.url;
+    t.append(img);
+  }
+  return t;
+}
+
+// 성유물 세트는 엔진이 enum 이름(GOLDEN_TROUPE)으로 준다. 아이콘 맵과 툴팁이 쓰는 것은
+// 한글 라벨이라 레지스트리 표로 옮긴다 — 이름 대응을 JS 가 따로 들고 있지 않게.
+function setLabel(id) {
+  const found = reg.artifactSets.find((s) => s.id === id);
+  return found ? found.label : null;
 }
 
 // 캐릭터를 바꾸면 그 캐릭터의 맨몸 빌드로 갈아 끼운다 — [+ 캐릭터 추가]와 같은 출발점이다.
@@ -261,6 +526,14 @@ function buildEditor(c) {
   c.artifacts = c.artifacts || {};
   const d = make("div");
 
+  // 캐릭터 교체. 카드에는 이름만 있고 드롭다운이 없어서(카드는 보여주기만 한다)
+  // 슬롯의 캐릭터를 바꾸는 자리는 여기다.
+  const swap = opt(reg.characters, c.character, (x) => x.name, (x) => x.name);
+  swap.title = "이 슬롯의 캐릭터를 바꾼다 (빌드는 맨몸으로 다시 시작한다)";
+  swap.onchange = () => { swapCharacter(editing, swap.value); };
+  d.append(make("div", { className: "art-share" },
+    make("span", { className: "name", textContent: "캐릭터" }), swap));
+
   // 빌드 주고받기 — 이 브라우저에 저장해 둔 빌드(왼쪽)와 JSON(오른쪽).
   // 드롭다운에는 지금 캐릭터로 저장한 빌드만 올린다. 다른 캐릭터 빌드까지 섞으면
   // 목록이 길어지는 데다, 골랐을 때 슬롯의 캐릭터까지 갈리는 게 예상 밖이다
@@ -310,14 +583,14 @@ function buildEditor(c) {
   // 레벨 / 돌파 / 명함 / 특성 레벨
   const row = make("div", { className: "row" });
 
-  const lv = make("input", { type: "number", value: c.level, min: 1, max: reg.maxLevel });
+  const lv = make("input", { type: "number", value: c.level, min: 1 });
   lv.style.width = "4rem";
   lv.onchange = () => {
     c.level     = Number(lv.value);
     c.ascension = phaseFor(c.level, c.ascension);
     structuralChange(true);        // 레벨이 바뀌면 돌파 선택지 자체가 달라진다
   };
-  row.append(make("label", { textContent: "레벨" }, lv));
+  row.append(make("label", { textContent: "레벨" }, numField(lv, reg.maxLevel)));
 
   // 돌파 — 상한 레벨(20/40/50/60/70/80)에서만 두 갈래다. Lv.80/80(미돌파)과
   // Lv.80/90(돌파 완료)은 기초 스탯도 어센션 보너스도 다른 캐릭터라 물어봐야 한다.
@@ -331,29 +604,50 @@ function buildEditor(c) {
   asel.onchange = () => { c.ascension = Number(asel.value); structuralChange(); };
   row.append(make("label", { textContent: "돌파" }, asel));
 
-  for (const [key, label, min, max] of [
-    ["constellation", "명함", 0, 6],
-    ["naLevel", "평타", 1, 10], ["skillLevel", "E", 1, 10], ["burstLevel", "Q", 1, 10],
+  // 명함 — 특성 레벨을 올리는 근거라, 바뀌면 특성 입력 옆의 「+3」도 따라 바뀌어야
+  // 한다. 그래서 레벨과 같이 창을 다시 그린다.
+  const con = make("input", { type: "number", value: c.constellation, min: 0 });
+  con.style.width = "4rem";
+  con.onchange = () => { c.constellation = Number(con.value); structuralChange(true); };
+  row.append(make("label", { textContent: "명함" }, numField(con, 6)));
+
+  // 특성 레벨 — 상자에 치는 것은 손으로 올리는 기본 레벨(1~10)이고, 명함 상승분은
+  // 엔진이 그 위에 더한다. 어느 명함이 어느 특성을 올리는지는 캐릭터마다 달라
+  // (모나는 C5가 스킬·C3가 폭발, 나비아는 반대) 엔진이 준 표를 읽는다.
+  const up = meta.talentUp || {};
+  for (const [key, label, at] of [
+    ["naLevel", "평타", up.na], ["skillLevel", "E", up.skill], ["burstLevel", "Q", up.burst],
   ]) {
-    const inp = make("input", { type: "number", value: c[key], min, max });
+    const inp = make("input", { type: "number", value: c[key], min: 1 });
     inp.style.width = "4rem";
     inp.onchange = () => { c[key] = Number(inp.value); structuralChange(); };
-    row.append(make("label", { textContent: label }, inp));
+    // 그 명함에 실제로 이르렀을 때만 적는다 — 아직 안 열린 +3을 최대치에 얹으면
+    // 화면의 숫자가 이 빌드의 것이 아니게 된다.
+    const on = at && c.constellation >= at;
+    row.append(make("label", { textContent: label },
+      numField(inp, reg.maxTalentLevel,
+               { bonus: on ? up.step : 0, bonusFrom: `명함 ${at}` })));
   }
   d.append(row);
 
   // 획득 가능 특성 (니콜의 마도 등)
   if (meta.unlockableTraits && meta.unlockableTraits.length) {
     const trow = make("div", { className: "row" });
+    // 상황 질문의 다중 선택과 같은 칩이다 — 켜진 것이 한눈에 보이고, 글자든 여백이든
+    // 칩 안 아무 데나 누르면 토글된다.
     for (const t of meta.unlockableTraits) {
       const info = reg.traits.find((x) => x.id === t);
-      const cb = make("input", { type: "checkbox", checked: (c.traits || []).includes(t) });
+      const on = (c.traits || []).includes(t);
+      const cb = make("input", { type: "checkbox", checked: on });
+      const chip = make("label", { className: "chip" + (on ? " on" : "") },
+                        cb, make("span", { textContent: info ? info.label : t }));
       cb.onchange = () => {
         c.traits = cb.checked ? [...(c.traits || []), t]
                               : (c.traits || []).filter((x) => x !== t);
+        chip.classList.toggle("on", cb.checked);
         structuralChange();
       };
-      trow.append(make("label", { textContent: info ? info.label : t }, cb));
+      trow.append(chip);
     }
     d.append(trow);
   }
@@ -372,10 +666,10 @@ function buildEditor(c) {
                          // 레벨을 그대로 물려주되 새 상한에 맞춰 자른다.
                          level: c.weapon?.level, ascension: c.weapon?.ascension })
       : null;
-    structuralChange(true);   // 레벨/돌파/정련 입력의 활성 여부와 선택지가 바뀐다
+    structuralChange(true);   // 레벨/돌파/재련 입력의 활성 여부와 선택지가 바뀐다
   };
   const rsel = opt([1, 2, 3, 4, 5], c.weapon ? c.weapon.refinement : 1,
-                   (x) => x, (x) => "정련 " + x);
+                   (x) => x, (x) => "재련 " + x);
   rsel.disabled = !c.weapon;
   rsel.onchange = () => { if (c.weapon) { c.weapon.refinement = Number(rsel.value); structuralChange(); } };
   wrow.append(make("label", { textContent: "무기" }, wsel), rsel);
@@ -387,17 +681,17 @@ function buildEditor(c) {
   const wlrow = make("div", { className: "row" });
 
   const wlv = make("input", {
-    type: "number", value: c.weapon ? c.weapon.level : "", min: 1, max: wrule.maxLevel,
+    type: "number", value: c.weapon ? c.weapon.level : "", min: 1,
   });
   wlv.style.width = "4rem";
-  wlv.disabled = !c.weapon;
+  wlv.disabled = !c.weapon;        // numField가 [최대] 버튼도 같이 잠근다 — 먼저 정해야 한다
   wlv.onchange = () => {
     if (!c.weapon) return;
     c.weapon.level = Number(wlv.value);
     Object.assign(c.weapon, weaponLevelFor(c.weapon));
     structuralChange(true);        // 레벨이 바뀌면 돌파 선택지 자체가 달라진다
   };
-  wlrow.append(make("label", { textContent: "무기 레벨" }, wlv));
+  wlrow.append(make("label", { textContent: "무기 레벨" }, numField(wlv, wrule.maxLevel)));
 
   const wphases = c.weapon ? wrule.phases[c.weapon.level] || [c.weapon.ascension] : [];
   const wasel = opt(wphases, c.weapon ? c.weapon.ascension : "", (p) => p, (p) => `${p}돌파`);
@@ -699,7 +993,8 @@ function recalc() {
   $("errors").textContent = "";
   if (!party.length) {
     for (const id of ["questions", "stats", "damage"]) $(id).innerHTML = "";
-    $("qcount").textContent = "— 파티를 편성하세요";
+    setQuestionCount("", "파티를 편성하세요");
+    $("dmgtarget").textContent = "";
     return;
   }
 
@@ -720,12 +1015,30 @@ function recalc() {
 
   renderQuestions(out.questions, out.pending, out.stale);
   renderStats(out.stats);
-  renderDamage(out.damage);
 
-  $("dmgtarget").textContent = (target ? `— ${target}` : "— 전원") + " · 히트를 누르면 근거";
-  $("qcount").textContent = out.errors.length
-    ? "— 빌드 오류"
-    : `— 총 ${out.questions.length}개 중 미답 ${out.pending.length}개 · 계산 ${ms.toFixed(0)}ms`;
+  // 엔진은 빈 targets 를 「전원」으로 읽는다(_damage). 하나도 안 고른 상태를 그쪽에
+  // 표현할 방법이 없어서 그 한 경우만 여기서 비운다.
+  const picked = selectedTargets();
+  renderDamage(picked.length ? out.damage : []);
+
+  const who = !picked.length ? "선택 없음"
+            : picked.length === partyNames().length ? "전원"
+            : picked.join(", ");
+  $("dmgtarget").textContent = `— ${who} · 히트를 누르면 근거`;
+  if (out.errors.length) {
+    setQuestionCount("오류", "빌드 오류");
+  } else {
+    setQuestionCount(
+      out.pending.length ? `미답 ${out.pending.length}` : "",
+      `총 ${out.questions.length}개 중 미답 ${out.pending.length}개 · 계산 ${ms.toFixed(0)}ms`);
+  }
+}
+
+// 탭에는 눈에 걸릴 것(미답 개수)만 짧게 걸고, 자세한 줄은 패널 안에 둔다.
+// 다 답했으면 탭에서 지운다 — 「미답 0」이 계속 붙어 있으면 배지가 아니라 장식이 된다.
+function setQuestionCount(badge, detail) {
+  $("qcount").textContent = badge;
+  $("qinfo").textContent = detail;
 }
 
 // ── 질문 ─────────────────────────────────────────────────────────────────
@@ -735,8 +1048,17 @@ function renderQuestions(questions, pending, stale) {
   box.innerHTML = "";
 
   for (const q of questions) {
-    const div = make("div", { className: "q" + (pendingSet.has(q.id) ? " pending" : "") });
-    const label = make("label", { textContent: q.prompt });
+    // 예/아니오 질문은 카드 통째가 체크박스의 라벨이다 — 작은 네모를 정확히 겨눌
+    // 필요 없이 아무 데나 누르면 켜지고 꺼진다. (다른 종류는 카드 안에 드롭다운·숫자
+    // 입력이 들어가므로 카드 클릭을 가로채면 오히려 방해가 된다.)
+    const tap = q.kind === "bool";
+    const div = make(tap ? "label" : "div",
+      { className: "q" + (tap ? " tap" : "") + (pendingSet.has(q.id) ? " pending" : "") });
+
+    // 라벨 안에 라벨을 넣을 수 없어 문구는 <div>로 둔다 (칩·체크박스는 각자 라벨이다).
+    // 성유물 질문의 착용자는 엔진이 문구 앞머리에 접어 보낸다 — 「[스커크·진사 왕생록
+    // 4세트] …」. 같은 세트를 두 명이 끼면 문구가 완전히 같아지기 때문이다.
+    const label = make("div", { className: "qp", textContent: q.prompt });
     for (const [cond, text] of [[pendingSet.has(q.id), "미답"], [staleSet.has(q.id), "범위 조정됨"]]) {
       if (cond) label.prepend(make("span", { className: "badge", textContent: text }));
     }
@@ -755,10 +1077,11 @@ function widget(q) {
     return e;
   }
   if (q.kind === "int") {
-    const e = make("input", { type: "number", min: q.min, max: q.max,
-                              value: cur !== undefined ? cur : q.min });
+    // 스택 수·인원처럼 상한이 질문마다 다르다. 화면에 범위를 적어 두지 않으면
+    // 몇까지 되는지 알 수 없어 최대치로 맞춰 보는 것부터 못 한다.
+    const e = make("input", { type: "number", value: cur !== undefined ? cur : q.min });
     e.onchange = () => bump(Number(e.value));
-    return e;
+    return numField(e, q.max, { min: q.min, button: true });
   }
   if (q.kind === "choice") {
     const e = opt(q.options.map((o, i) => i), cur !== undefined ? cur : 0,
@@ -822,9 +1145,11 @@ function buildTable(headers, rows, onRow = null, numFrom = 1) {
   return t;
 }
 
+// 원마는 EM 스케일 버프(방식 B)와 반응 배율의 재료라, 값이 안 보이면 반응 피해가 왜
+// 그 숫자인지 화면에서 이을 수가 없다. 다른 스탯과 달리 %가 아닌 실수치다.
 function renderStats(stats) {
-  table($("stats"), ["캐릭터", "공격력", "HP", "방어력", "치확", "치피", "충전"],
-    stats.map((s) => [s.name, num(s.atk), num(s.hp), num(s.def),
+  table($("stats"), ["캐릭터", "공격력", "HP", "방어력", "원마", "치확", "치피", "충전"],
+    stats.map((s) => [s.name, num(s.atk), num(s.hp), num(s.def), num(s.em),
                       pct(s.critRate), pct(s.critDmg), pct(s.energyRecharge)]));
 }
 
@@ -855,10 +1180,19 @@ function renderDamage(damage) {
 
     // 「1회당」인 이유: 로테이션에서 반응이 몇 번 터지는지는 이 계산기의 범위 밖이다.
     box.append(make("div", { className: "dmg-sub", textContent: "반응 피해 (1회당)" }));
+    // 반응 행도 히트 행과 똑같이 눌러서 설명을 연다. 격변은 원마와 반응 보너스만으로
+    // 숫자가 정해지는데 그 원마가 어디서 왔는지는 표만 봐서는 이을 수가 없다.
     box.append(buildTable(["반응", "피해 원소", "비크리", "크리", "기댓값"],
       block.reactions.map((r) => [r.label, r.element,
                                   num(r.nonCrit), num(r.crit), num(r.expected)]),
-      null, 2));
+      (tr, i) => {
+        const open = () => openExplainReaction(block.char, block.reactions[i]);
+        tr.className = "hit";
+        tr.tabIndex = 0;
+        tr.title = "왜 이 데미지인지 보기";
+        tr.onclick = open;
+        tr.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } };
+      }, 2));
   }
 }
 
@@ -885,8 +1219,8 @@ function reactionPicker(char, h) {
   return box;
 }
 
-// ── 히트 설명 ────────────────────────────────────────────────────────────
-// 히트를 누르면 "왜 이 숫자인가"를 계산을 한 번 더 돌려서 받아 온다.
+// ── 히트·반응 설명 ────────────────────────────────────────────────────────
+// 행을 누르면 "왜 이 숫자인가"를 계산을 한 번 더 돌려서 받아 온다.
 // 본 계산에 얹지 않고 따로 부르는 이유가 둘이다.
 //
 //  · settings.explain 은 히트 '이름'만 받는다. 같은 이름의 히트를 두 캐릭터가
@@ -895,56 +1229,74 @@ function reactionPicker(char, h) {
 //  · explain 을 켜면 엔진이 버프 기여를 기록하느라 느려진다. 누를 때만 켜면 된다.
 //
 // 답변(answers)은 지금 화면 그대로 넘긴다 — 표에 보이는 그 숫자를 설명해야 한다.
-function openExplain(char, hit) {
+function runExplain(char, title, extra) {
   let out;
   try {
-    out = unwrap(api.run_calculation(sheet({ targets: [char], explain: hit }), answers));
+    out = unwrap(api.run_calculation(sheet({ targets: [char], ...extra }), answers));
   } catch (e) {
     fail("설명 계산 실패", e);
     return;
   }
-  renderExplain(char, hit, out.explain);
+  renderExplain(char, title, out.explain);
   $("explain").showModal();
 }
 
-function renderExplain(char, hit, ex) {
-  $("explaintitle").textContent = `${char} · ${hit}`;
+const openExplain = (char, hit) => runExplain(char, hit, { explain: hit });
+
+// 확산은 피해 원소별로 네 행이라 반응 이름만으로는 행이 특정되지 않는다 — 원소까지 보낸다.
+const openExplainReaction = (char, r) =>
+  runExplain(char, `${r.label} · ${r.element} 피해`,
+             { explainReaction: { char, reaction: r.reaction, element: r.element } });
+
+function renderExplain(char, title, ex) {
+  $("explaintitle").textContent = `${char} · ${title}`;
   const body = $("explainbody");
   body.innerHTML = "";
 
-  // 표에 있던 히트가 사라지는 경우 — 답변이 바뀌어 히트 구성 자체가 달라졌을 때다.
+  // 표에 있던 행이 사라지는 경우 — 답변이 바뀌어 히트 구성이 달라졌거나, 파티가 바뀌어
+  // 그 반응이 더는 불가능해졌을 때다(엔진이 불가능한 반응은 설명하지 않는다).
   if (!ex) {
     body.append(make("div", { textContent:
-      "이 히트의 설명을 만들지 못했습니다. 답변이 바뀌어 히트가 사라졌을 수 있습니다 — 표를 다시 확인하세요." }));
+      "이 행의 설명을 만들지 못했습니다. 답변이나 파티가 바뀌어 히트·반응이 사라졌을 수 있습니다 — 표를 다시 확인하세요." }));
     return;
   }
 
+  const reaction = ex.kind === "reaction";
   const r = ex.result;
   body.append(make("div", { className: "ex-res",
     textContent: `비크리 ${num(r.nonCrit)} · 크리 ${num(r.crit)} · 기댓값 ${num(r.expected)}` }));
-  // 어떤 보너스가 왜 안 걸리는지는 결국 이 둘로 갈린다 (원소 없는 평타 = 물리라 냉기 보너스가 안 붙는다)
-  body.append(make("div", { className: "ex-kind",
-    textContent: `${ex.element} · ${ex.skillType}` }));
+  // 어떤 보너스가 왜 안 걸리는지는 결국 이 줄로 갈린다 (원소 없는 평타 = 물리라 냉기 보너스가 안 붙는다).
+  // 격변은 스킬 종류가 없는 대신, 버프 원장을 어느 히트에서 읽었는지를 밝힌다.
+  body.append(make("div", { className: "ex-kind", textContent: reaction
+    ? `${ex.element} 피해 · 격변 반응 (버프는 「${ex.carrier}」에서 읽음)`
+    : `${ex.element} · ${ex.skillType}` }));
 
+  // 스탯 조립도 피해 보너스 풀도 통째로 접히는 이유를 유저가 눈치로 알아내게 두지 않는다.
+  if (reaction) {
+    body.append(make("div", { className: "ex-note", textContent:
+      "격변은 계수·스탯·%피해 보너스·방어력 배율을 타지 않는다. 원마·반응 보너스·내성만 걸린다." }));
+  }
+
+  const noun = reaction ? "반응" : "히트";
   body.append(section("공식 — 이 순서로 곱해져 숫자가 됐다", formulaTable(ex.formula)));
-  if (ex.stats.length) body.append(applySection("스탯 조립", ex.stats, statBlock));
-  for (const g of ex.groups) body.append(applySection(g.label, g.fields, fieldBlock));
+  if (ex.stats.length) body.append(applySection("스탯 조립", ex.stats, statBlock, noun));
+  for (const g of ex.groups) body.append(applySection(g.label, g.fields, fieldBlock, noun));
 }
 
 function section(title, ...kids) {
   return make("div", { className: "ex-sec" }, make("h3", { textContent: title }), ...kids);
 }
 
-// 이 히트에 실제로 들어가는 것만 펼치고, 나머지는 접어 둔다.
+// 이 히트(반응)에 실제로 들어가는 것만 펼치고, 나머지는 접어 둔다.
 // 지우지 않는 이유 — 걸릴 줄 알았던 버프가 왜 안 걸렸는지가 대개 알고 싶은 것이다.
-function applySection(title, items, render) {
+function applySection(title, items, render, noun = "히트") {
   const on  = items.filter((x) => x.applied);
   const off = items.filter((x) => !x.applied);
   const sec = section(title, ...on.map(render));
 
   if (off.length) {
     const box = make("details", { className: "ex-off" },
-      make("summary", { textContent: `이 히트엔 안 걸림 ${off.length}개` }));
+      make("summary", { textContent: `이 ${noun}엔 안 걸림 ${off.length}개` }));
     for (const x of off) box.append(render(x));
     sec.append(box);
   }
@@ -1021,7 +1373,7 @@ $("explainclose").onclick = () => $("explain").close();
 $("editorclose").onclick = () => closeEditor();
 $("editor").addEventListener("close", () => { editing = null; });   // Esc로 닫힌 경우
 $("reset").onclick = () => { answers = {}; recalc(); };
-$("target").onchange = (e) => { target = e.target.value; recalc(); };
 $("enemylv").onchange = (e) => { enemyLevel = Number(e.target.value); recalc(); };
+wireTabs();
 
 boot();

@@ -839,6 +839,40 @@ def build_transformative_context(
     )
 
 
+def transformative_input_fields(
+    reaction: ReactionType,
+    element:  Element,
+) -> frozenset[str]:
+    """격변 피해 1회가 캐리어 히트에서 **실제로 읽는** 필드. build_transformative_context와 짝이다.
+
+    위 함수가 채우는 자리와 하나씩 대응한다 — 한쪽만 고치면 화면이 '적용됨'으로 띄운
+    항목이 실제로는 안 곱해진다(damage_input_fields가 build_damage_context와 맺은 관계와 같다).
+
+    damage_input_fields를 격변에 돌려 쓰지 않는 이유가 둘이다.
+      · resolve_reaction(hit, ...)을 부르므로 캐리어 히트의 **내재 반응**(이네파의 달감전
+        피해 등)이 여기서 설명하려는 격변 반응을 덮어쓴다. 캐리어는 스탯 운반책일 뿐이라
+        그 히트가 무슨 반응을 내장했든 격변 피해와는 상관이 없다.
+      · element를 캐리어 히트에서 유도한다. 격변의 피해 원소는 **반응이** 정하므로
+        (과부하는 번개가 터뜨려도 불 내성) 트리거 원소의 내성 필드가 나와 어긋난다.
+
+    설명 화면에서 '적용되는 것만' 추리는 데 쓴다 — 계산 경로에서는 부르지 않는다.
+    """
+    # 계수·스탯·coeff_amp·%피해 보너스·flat_dmg_bonus·방어력 필드는 일부러 없다.
+    # _calc_transformative가 하나도 읽지 않는다(위 함수가 0으로 못박은 자리들).
+    fields = {element_res_reduction_field(element), "elemental_mastery"}
+
+    bonus = reaction_bonus_field(reaction)
+    if bonus:
+        fields.add(bonus)
+
+    # 격변은 캐릭터 치명타가 아니라 반응 전용 치명타를 쓴다 (_calc_transformative).
+    prefix = _REACTION_PREFIX.get(reaction)
+    if prefix:
+        fields |= {f"{prefix}_crit_rate", f"{prefix}_crit_dmg"}
+
+    return frozenset(fields)
+
+
 # 직접 피해 계열 — 계수 증폭·피해 보너스 풀(%DMG)·방어력 배율을 모두 쓰는 경로다.
 # 격변과 달반응은 반응 피해라 셋 다 안 받는다. 달반응 직접 피해는 계수×스탯만 쓴다.
 # damage.py의 _calc_* 와 어긋나면 화면에 '적용됨'으로 뜬 항목이 실제로는 안 곱해진다.

@@ -1,6 +1,6 @@
-"""히트별 버프 귀속 디버그 — explain_hit.
+"""버프 귀속 디버그 — explain_hit(직접 피해) / explain_transformative(격변 반응 1회).
 
-각 히트가 '어떤 버프로 이 숫자가 나왔는지'를 두 층으로 설명한다:
+'어떤 버프로 이 숫자가 나왔는지'를 두 층으로 설명한다:
   Layer 1 (버프 출처): 각 필드에 누가 얼마를 더했는지.
       · 가산 버프 → SkillHit._ledger (add()가 기록)
       · 비중첩 버프 → SkillHit._unique_buffs (apply_unique_buff가 이미 보관)
@@ -22,7 +22,9 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass, fields, MISSING, field as dc_field
 
-from gidc.core.profile import SkillHit, source_label, build_damage_context
+from gidc.core.profile import (
+    SkillHit, source_label, build_damage_context, build_transformative_context,
+)
 from gidc.core.damage import DamageResult, calculate
 
 _EPS = 1e-9
@@ -101,30 +103,19 @@ def _skillhit_defaults() -> dict:
 _DEFAULTS = _skillhit_defaults()
 
 
-def explain_hit(
-    hit: SkillHit,
-    *,
-    enemy,
-    reaction_type=None,
-    dmg_type=None,
-    char_level: int = 90,
-) -> HitExplanation:
-    # 1) 필드별 기여 수집: 가산(_ledger) + 비중첩(_unique_buffs)
+def _collect_parts(hit: SkillHit) -> dict[str, list]:
+    """필드별 기여 수집: 가산(_ledger) + 비중첩(_unique_buffs)."""
     parts: dict[str, list] = defaultdict(list)
     for c in hit._ledger:
         parts[c.field].append({"source": c.source, "delta": c.delta, "note": c.note})
     for (src, fld), val in hit._unique_buffs.items():
         if abs(val) > _EPS:
             parts[fld].append({"source": source_label(src), "delta": val, "note": "비중첩"})
+    return parts
 
-    # 2) 공식 트레이스 + 결과
-    trace: list = []
-    ctx = build_damage_context(
-        hit, enemy, reaction_type=reaction_type, dmg_type=dmg_type, char_level=char_level
-    )
-    result = calculate(ctx, trace)
 
-    # 3) 필드별 브레이크다운 (숫자 필드만, *_final은 파생이라 제외)
+def _field_breakdowns(hit: SkillHit, parts: dict[str, list]) -> dict[str, FieldBreakdown]:
+    """숫자 필드만 브레이크다운으로. *_final은 파생이라 제외한다."""
     fbs: dict[str, FieldBreakdown] = {}
     for f in fields(SkillHit):
         name = f.name
@@ -136,8 +127,56 @@ def explain_hit(
         fb = FieldBreakdown(name, float(val), _DEFAULTS.get(name, 0.0), parts.get(name, []))
         if fb.has_content():
             fbs[name] = fb
+    return fbs
 
-    return HitExplanation(hit.name, result, fbs, trace)
+
+def explain_hit(
+    hit: SkillHit,
+    *,
+    enemy,
+    reaction_type=None,
+    dmg_type=None,
+    char_level: int = 90,
+) -> HitExplanation:
+    parts = _collect_parts(hit)
+
+    trace: list = []
+    ctx = build_damage_context(
+        hit, enemy, reaction_type=reaction_type, dmg_type=dmg_type, char_level=char_level
+    )
+    result = calculate(ctx, trace)
+
+    return HitExplanation(hit.name, result, _field_breakdowns(hit, parts), trace)
+
+
+def explain_transformative(
+    carrier: SkillHit,
+    *,
+    enemy,
+    reaction,
+    element,
+    char_level: int = 90,
+) -> HitExplanation:
+    """격변 반응 1회의 설명. explain_hit과 같은 모양을 돌려주므로 화면이 그대로 재사용한다.
+
+    carrier는 **스탯·버프 캐리어**일 뿐 때리는 히트가 아니다 — 격변은 트리거한 캐릭터의
+    EM·반응 보너스·내성 감소만으로 정해지므로 그 캐릭터의 히트 아무 것이나 넘기면 된다
+    (build_transformative_context와 같은 규약). 그래서 Layer 1(버프 출처)은 캐리어의
+    원장에서 그대로 읽고, Layer 2(공식)만 격변 경로로 돈다.
+
+    element는 **피해 원소**다 — 반응이 정하며 캐리어의 원소가 아니다.
+    어떤 필드가 실제로 이 숫자에 들어가는지는 profile.transformative_input_fields가 답한다.
+    """
+    parts = _collect_parts(carrier)
+
+    trace: list = []
+    ctx = build_transformative_context(
+        carrier, enemy, reaction=reaction, element=element, char_level=char_level
+    )
+    result = calculate(ctx, trace)
+
+    name = f"{reaction.value} ({element.value} 피해)"
+    return HitExplanation(name, result, _field_breakdowns(carrier, parts), trace)
 
 
 # ── 텍스트 렌더러 ────────────────────────────────────────────────────────────

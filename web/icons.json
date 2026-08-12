@@ -1,0 +1,452 @@
+{
+ "note": "tools/build_icon_map.py 가 생성한다. 손으로 고치지 말 것.",
+ "characters": {
+  "베넷": "UI_AvatarIcon_Bennett",
+  "슈브르즈": "UI_AvatarIcon_Chevreuse",
+  "니콜": "UI_AvatarIcon_Nicole",
+  "마비카": "UI_AvatarIcon_Mavuika",
+  "푸리나": "UI_AvatarIcon_Furina",
+  "콜롬비나": "UI_AvatarIcon_Columbina",
+  "모나": "UI_AvatarIcon_Mona",
+  "에스코피에": "UI_AvatarIcon_Escoffier",
+  "스커크": "UI_AvatarIcon_SkirkNew",
+  "시틀라리": "UI_AvatarIcon_Citlali",
+  "이네파": "UI_AvatarIcon_Ineffa",
+  "실로닌": "UI_AvatarIcon_Xilonen",
+  "나비아": "UI_AvatarIcon_Navia"
+ },
+ "weapons": {
+  "타오르는 천 개의 태양": "UI_EquipIcon_Claymore_RadianceSword",
+  "판정": "UI_EquipIcon_Claymore_GoldenVerdict",
+  "바위산을 맴도는 노래": "UI_EquipIcon_Sword_XochitlsTube",
+  "천공의 검": "UI_EquipIcon_Sword_Dvalin",
+  "매의 검": "UI_EquipIcon_Sword_Falcon",
+  "창백한 섬광": "UI_EquipIcon_Sword_OuterSword",
+  "페보니우스 검": "UI_EquipIcon_Sword_Zephyrus",
+  "에슈의 재앙": "UI_EquipIcon_Sword_SacrificialNgombe",
+  "채굴의 삽": "UI_EquipIcon_Pole_Ilmarinen",
+  "결투의 창": "UI_EquipIcon_Pole_Gladiator",
+  "위대한 사막 현자의 대답": "UI_EquipIcon_Pole_Caduceus",
+  "파멸의 빛고리": "UI_EquipIcon_Pole_Perdix",
+  "맛의 지휘자": "UI_EquipIcon_Pole_Trident",
+  "천공의 마루": "UI_EquipIcon_Pole_Dvalin",
+  "별지기의 시선": "UI_EquipIcon_Catalyst_Figurines",
+  "페보니우스 비전": "UI_EquipIcon_Catalyst_Zephyrus",
+  "제례의 악장": "UI_EquipIcon_Catalyst_Fossil",
+  "드래곤 슬레이어 영웅담": "UI_EquipIcon_Catalyst_Pulpfic"
+ },
+ "artifacts": {
+  "그림자 속 산산조각 난 꿈": {
+   "꽃": "UI_RelicIcon_15046_4",
+   "깃털": "UI_RelicIcon_15046_2",
+   "시계": "UI_RelicIcon_15046_5",
+   "성배": "UI_RelicIcon_15046_1",
+   "왕관": "UI_RelicIcon_15046_3"
+  },
+  "하늘의 은총": {
+   "꽃": "UI_RelicIcon_15045_4",
+   "깃털": "UI_RelicIcon_15045_2",
+   "시계": "UI_RelicIcon_15045_5",
+   "성배": "UI_RelicIcon_15045_1",
+   "왕관": "UI_RelicIcon_15045_3"
+  },
+  "바람이 시작되는 날": {
+   "꽃": "UI_RelicIcon_15044_4",
+   "깃털": "UI_RelicIcon_15044_2",
+   "시계": "UI_RelicIcon_15044_5",
+   "성배": "UI_RelicIcon_15044_1",
+   "왕관": "UI_RelicIcon_15044_3"
+  },
+  "샛별과 달의 여명": {
+   "꽃": "UI_RelicIcon_15043_4",
+   "깃털": "UI_RelicIcon_15043_2",
+   "시계": "UI_RelicIcon_15043_5",
+   "성배": "UI_RelicIcon_15043_1",
+   "왕관": "UI_RelicIcon_15043_3"
+  },
+  "달을 엮는 밤노래": {
+   "꽃": "UI_RelicIcon_15042_4",
+   "깃털": "UI_RelicIcon_15042_2",
+   "시계": "UI_RelicIcon_15042_5",
+   "성배": "UI_RelicIcon_15042_1",
+   "왕관": "UI_RelicIcon_15042_3"
+  },
+  "하늘 경계가 드러난 밤": {
+   "꽃": "UI_RelicIcon_15041_4",
+   "깃털": "UI_RelicIcon_15041_2",
+   "시계": "UI_RelicIcon_15041_5",
+   "성배": "UI_RelicIcon_15041_1",
+   "왕관": "UI_RelicIcon_15041_3"
+  },
+  "깊은 회랑의 피날레": {
+   "꽃": "UI_RelicIcon_15040_4",
+   "깃털": "UI_RelicIcon_15040_2",
+   "시계": "UI_RelicIcon_15040_5",
+   "성배": "UI_RelicIcon_15040_1",
+   "왕관": "UI_RelicIcon_15040_3"
+  },
+  "긴 밤의 맹세": {
+   "꽃": "UI_RelicIcon_15039_4",
+   "깃털": "UI_RelicIcon_15039_2",
+   "시계": "UI_RelicIcon_15039_5",
+   "성배": "UI_RelicIcon_15039_1",
+   "왕관": "UI_RelicIcon_15039_3"
+  },
+  "흑요석 비전": {
+   "꽃": "UI_RelicIcon_15038_4",
+   "깃털": "UI_RelicIcon_15038_2",
+   "시계": "UI_RelicIcon_15038_5",
+   "성배": "UI_RelicIcon_15038_1",
+   "왕관": "UI_RelicIcon_15038_3"
+  },
+  "잿더미성 용사의 두루마리": {
+   "꽃": "UI_RelicIcon_15037_4",
+   "깃털": "UI_RelicIcon_15037_2",
+   "시계": "UI_RelicIcon_15037_5",
+   "성배": "UI_RelicIcon_15037_1",
+   "왕관": "UI_RelicIcon_15037_3"
+  },
+  "미완의 몽상": {
+   "꽃": "UI_RelicIcon_15036_4",
+   "깃털": "UI_RelicIcon_15036_2",
+   "시계": "UI_RelicIcon_15036_5",
+   "성배": "UI_RelicIcon_15036_1",
+   "왕관": "UI_RelicIcon_15036_3"
+  },
+  "조화로운 공상의 단편": {
+   "꽃": "UI_RelicIcon_15035_4",
+   "깃털": "UI_RelicIcon_15035_2",
+   "시계": "UI_RelicIcon_15035_5",
+   "성배": "UI_RelicIcon_15035_1",
+   "왕관": "UI_RelicIcon_15035_3"
+  },
+  "메아리숲의 야화": {
+   "꽃": "UI_RelicIcon_15034_4",
+   "깃털": "UI_RelicIcon_15034_2",
+   "시계": "UI_RelicIcon_15034_5",
+   "성배": "UI_RelicIcon_15034_1",
+   "왕관": "UI_RelicIcon_15034_3"
+  },
+  "지난날의 노래": {
+   "꽃": "UI_RelicIcon_15033_4",
+   "깃털": "UI_RelicIcon_15033_2",
+   "시계": "UI_RelicIcon_15033_5",
+   "성배": "UI_RelicIcon_15033_1",
+   "왕관": "UI_RelicIcon_15033_3"
+  },
+  "황금 극단": {
+   "꽃": "UI_RelicIcon_15032_4",
+   "깃털": "UI_RelicIcon_15032_2",
+   "시계": "UI_RelicIcon_15032_5",
+   "성배": "UI_RelicIcon_15032_1",
+   "왕관": "UI_RelicIcon_15032_3"
+  },
+  "그림자 사냥꾼": {
+   "꽃": "UI_RelicIcon_15031_4",
+   "깃털": "UI_RelicIcon_15031_2",
+   "시계": "UI_RelicIcon_15031_5",
+   "성배": "UI_RelicIcon_15031_1",
+   "왕관": "UI_RelicIcon_15031_3"
+  },
+  "감로빛 꽃바다": {
+   "꽃": "UI_RelicIcon_15030_4",
+   "깃털": "UI_RelicIcon_15030_2",
+   "시계": "UI_RelicIcon_15030_5",
+   "성배": "UI_RelicIcon_15030_1",
+   "왕관": "UI_RelicIcon_15030_3"
+  },
+  "님프의 꿈": {
+   "꽃": "UI_RelicIcon_15029_4",
+   "깃털": "UI_RelicIcon_15029_2",
+   "시계": "UI_RelicIcon_15029_5",
+   "성배": "UI_RelicIcon_15029_1",
+   "왕관": "UI_RelicIcon_15029_3"
+  },
+  "잃어버린 낙원의 꽃": {
+   "꽃": "UI_RelicIcon_15028_4",
+   "깃털": "UI_RelicIcon_15028_2",
+   "시계": "UI_RelicIcon_15028_5",
+   "성배": "UI_RelicIcon_15028_1",
+   "왕관": "UI_RelicIcon_15028_3"
+  },
+  "모래 위 누각의 역사": {
+   "꽃": "UI_RelicIcon_15027_4",
+   "깃털": "UI_RelicIcon_15027_2",
+   "시계": "UI_RelicIcon_15027_5",
+   "성배": "UI_RelicIcon_15027_1",
+   "왕관": "UI_RelicIcon_15027_3"
+  },
+  "도금된 꿈": {
+   "꽃": "UI_RelicIcon_15026_4",
+   "깃털": "UI_RelicIcon_15026_2",
+   "시계": "UI_RelicIcon_15026_5",
+   "성배": "UI_RelicIcon_15026_1",
+   "왕관": "UI_RelicIcon_15026_3"
+  },
+  "숲의 기억": {
+   "꽃": "UI_RelicIcon_15025_4",
+   "깃털": "UI_RelicIcon_15025_2",
+   "시계": "UI_RelicIcon_15025_5",
+   "성배": "UI_RelicIcon_15025_1",
+   "왕관": "UI_RelicIcon_15025_3"
+  },
+  "제사의 여운": {
+   "꽃": "UI_RelicIcon_15024_4",
+   "깃털": "UI_RelicIcon_15024_2",
+   "시계": "UI_RelicIcon_15024_5",
+   "성배": "UI_RelicIcon_15024_1",
+   "왕관": "UI_RelicIcon_15024_3"
+  },
+  "진사 왕생록": {
+   "꽃": "UI_RelicIcon_15023_4",
+   "깃털": "UI_RelicIcon_15023_2",
+   "시계": "UI_RelicIcon_15023_5",
+   "성배": "UI_RelicIcon_15023_1",
+   "왕관": "UI_RelicIcon_15023_3"
+  },
+  "풍요로운 꿈의 껍데기": {
+   "꽃": "UI_RelicIcon_15021_4",
+   "깃털": "UI_RelicIcon_15021_2",
+   "시계": "UI_RelicIcon_15021_5",
+   "성배": "UI_RelicIcon_15021_1",
+   "왕관": "UI_RelicIcon_15021_3"
+  },
+  "바다에 물든 거대 조개": {
+   "꽃": "UI_RelicIcon_15022_4",
+   "깃털": "UI_RelicIcon_15022_2",
+   "시계": "UI_RelicIcon_15022_5",
+   "성배": "UI_RelicIcon_15022_1",
+   "왕관": "UI_RelicIcon_15022_3"
+  },
+  "절연의 기치": {
+   "꽃": "UI_RelicIcon_15020_4",
+   "깃털": "UI_RelicIcon_15020_2",
+   "시계": "UI_RelicIcon_15020_5",
+   "성배": "UI_RelicIcon_15020_1",
+   "왕관": "UI_RelicIcon_15020_3"
+  },
+  "추억의 시메나와": {
+   "꽃": "UI_RelicIcon_15019_4",
+   "깃털": "UI_RelicIcon_15019_2",
+   "시계": "UI_RelicIcon_15019_5",
+   "성배": "UI_RelicIcon_15019_1",
+   "왕관": "UI_RelicIcon_15019_3"
+  },
+  "창백의 화염": {
+   "꽃": "UI_RelicIcon_15018_4",
+   "깃털": "UI_RelicIcon_15018_2",
+   "시계": "UI_RelicIcon_15018_5",
+   "성배": "UI_RelicIcon_15018_1",
+   "왕관": "UI_RelicIcon_15018_3"
+  },
+  "견고한 천암": {
+   "꽃": "UI_RelicIcon_15017_4",
+   "깃털": "UI_RelicIcon_15017_2",
+   "시계": "UI_RelicIcon_15017_5",
+   "성배": "UI_RelicIcon_15017_1",
+   "왕관": "UI_RelicIcon_15017_3"
+  },
+  "몰락한 마음": {
+   "꽃": "UI_RelicIcon_15016_4",
+   "깃털": "UI_RelicIcon_15016_2",
+   "시계": "UI_RelicIcon_15016_5",
+   "성배": "UI_RelicIcon_15016_1",
+   "왕관": "UI_RelicIcon_15016_3"
+  },
+  "얼음바람 속에서 길잃은 용사": {
+   "꽃": "UI_RelicIcon_14001_4",
+   "깃털": "UI_RelicIcon_14001_2",
+   "시계": "UI_RelicIcon_14001_5",
+   "성배": "UI_RelicIcon_14001_1",
+   "왕관": "UI_RelicIcon_14001_3"
+  },
+  "옛 왕실의 의식": {
+   "꽃": "UI_RelicIcon_15007_4",
+   "깃털": "UI_RelicIcon_15007_2",
+   "시계": "UI_RelicIcon_15007_5",
+   "성배": "UI_RelicIcon_15007_1",
+   "왕관": "UI_RelicIcon_15007_3"
+  },
+  "피에 물든 기사도": {
+   "꽃": "UI_RelicIcon_15008_4",
+   "깃털": "UI_RelicIcon_15008_2",
+   "시계": "UI_RelicIcon_15008_5",
+   "성배": "UI_RelicIcon_15008_1",
+   "왕관": "UI_RelicIcon_15008_3"
+  },
+  "불 위를 걷는 현인": {
+   "꽃": "UI_RelicIcon_14003_4",
+   "깃털": "UI_RelicIcon_14003_2",
+   "시계": "UI_RelicIcon_14003_5",
+   "성배": "UI_RelicIcon_14003_1",
+   "왕관": "UI_RelicIcon_14003_3"
+  },
+  "불타오르는 화염의 마녀": {
+   "꽃": "UI_RelicIcon_15006_4",
+   "깃털": "UI_RelicIcon_15006_2",
+   "시계": "UI_RelicIcon_15006_5",
+   "성배": "UI_RelicIcon_15006_1",
+   "왕관": "UI_RelicIcon_15006_3"
+  },
+  "날아오르는 유성": {
+   "꽃": "UI_RelicIcon_15015_4",
+   "깃털": "UI_RelicIcon_15015_2",
+   "시계": "UI_RelicIcon_15015_5",
+   "성배": "UI_RelicIcon_15015_1",
+   "왕관": "UI_RelicIcon_15015_3"
+  },
+  "유구한 반암": {
+   "꽃": "UI_RelicIcon_15014_4",
+   "깃털": "UI_RelicIcon_15014_2",
+   "시계": "UI_RelicIcon_15014_5",
+   "성배": "UI_RelicIcon_15014_1",
+   "왕관": "UI_RelicIcon_15014_3"
+  },
+  "사랑받는 소녀": {
+   "꽃": "UI_RelicIcon_14004_4",
+   "깃털": "UI_RelicIcon_14004_2",
+   "시계": "UI_RelicIcon_14004_5",
+   "성배": "UI_RelicIcon_14004_1",
+   "왕관": "UI_RelicIcon_14004_3"
+  },
+  "청록색 그림자": {
+   "꽃": "UI_RelicIcon_15002_4",
+   "깃털": "UI_RelicIcon_15002_2",
+   "시계": "UI_RelicIcon_15002_5",
+   "성배": "UI_RelicIcon_15002_1",
+   "왕관": "UI_RelicIcon_15002_3"
+  },
+  "뇌명을 평정한 존자": {
+   "꽃": "UI_RelicIcon_14002_4",
+   "깃털": "UI_RelicIcon_14002_2",
+   "시계": "UI_RelicIcon_14002_5",
+   "성배": "UI_RelicIcon_14002_1",
+   "왕관": "UI_RelicIcon_14002_3"
+  },
+  "번개 같은 분노": {
+   "꽃": "UI_RelicIcon_15005_4",
+   "깃털": "UI_RelicIcon_15005_2",
+   "시계": "UI_RelicIcon_15005_5",
+   "성배": "UI_RelicIcon_15005_1",
+   "왕관": "UI_RelicIcon_15005_3"
+  },
+  "대지를 유랑하는 악단": {
+   "꽃": "UI_RelicIcon_15003_4",
+   "깃털": "UI_RelicIcon_15003_2",
+   "시계": "UI_RelicIcon_15003_5",
+   "성배": "UI_RelicIcon_15003_1",
+   "왕관": "UI_RelicIcon_15003_3"
+  },
+  "검투사의 피날레": {
+   "꽃": "UI_RelicIcon_15001_4",
+   "깃털": "UI_RelicIcon_15001_2",
+   "시계": "UI_RelicIcon_15001_5",
+   "성배": "UI_RelicIcon_15001_1",
+   "왕관": "UI_RelicIcon_15001_3"
+  },
+  "얼음을 모시는 자": {
+   "왕관": "UI_RelicIcon_15013_3"
+  },
+  "불을 모시는 자": {
+   "왕관": "UI_RelicIcon_15009_3"
+  },
+  "물을 모시는 자": {
+   "왕관": "UI_RelicIcon_15010_3"
+  },
+  "뇌명을 모시는 자": {
+   "왕관": "UI_RelicIcon_15011_3"
+  },
+  "학사": {
+   "꽃": "UI_RelicIcon_10012_4",
+   "깃털": "UI_RelicIcon_10012_2",
+   "시계": "UI_RelicIcon_10012_5",
+   "성배": "UI_RelicIcon_10012_1",
+   "왕관": "UI_RelicIcon_10012_3"
+  },
+  "노름꾼": {
+   "꽃": "UI_RelicIcon_10008_4",
+   "깃털": "UI_RelicIcon_10008_2",
+   "시계": "UI_RelicIcon_10008_5",
+   "성배": "UI_RelicIcon_10008_1",
+   "왕관": "UI_RelicIcon_10008_3"
+  },
+  "무인": {
+   "꽃": "UI_RelicIcon_10006_4",
+   "깃털": "UI_RelicIcon_10006_2",
+   "시계": "UI_RelicIcon_10006_5",
+   "성배": "UI_RelicIcon_10006_1",
+   "왕관": "UI_RelicIcon_10006_3"
+  },
+  "용사의 마음": {
+   "꽃": "UI_RelicIcon_10002_4",
+   "깃털": "UI_RelicIcon_10002_2",
+   "시계": "UI_RelicIcon_10002_5",
+   "성배": "UI_RelicIcon_10002_1",
+   "왕관": "UI_RelicIcon_10002_3"
+  },
+  "수호자의 마음": {
+   "꽃": "UI_RelicIcon_10003_4",
+   "깃털": "UI_RelicIcon_10003_2",
+   "시계": "UI_RelicIcon_10003_5",
+   "성배": "UI_RelicIcon_10003_1",
+   "왕관": "UI_RelicIcon_10003_3"
+  },
+  "유배자": {
+   "꽃": "UI_RelicIcon_10009_4",
+   "깃털": "UI_RelicIcon_10009_2",
+   "시계": "UI_RelicIcon_10009_5",
+   "성배": "UI_RelicIcon_10009_1",
+   "왕관": "UI_RelicIcon_10009_3"
+  },
+  "교관": {
+   "꽃": "UI_RelicIcon_10007_4",
+   "깃털": "UI_RelicIcon_10007_2",
+   "시계": "UI_RelicIcon_10007_5",
+   "성배": "UI_RelicIcon_10007_1",
+   "왕관": "UI_RelicIcon_10007_3"
+  },
+  "전투광": {
+   "꽃": "UI_RelicIcon_10005_4",
+   "깃털": "UI_RelicIcon_10005_2",
+   "시계": "UI_RelicIcon_10005_5",
+   "성배": "UI_RelicIcon_10005_1",
+   "왕관": "UI_RelicIcon_10005_3"
+  },
+  "기적": {
+   "꽃": "UI_RelicIcon_10004_4",
+   "깃털": "UI_RelicIcon_10004_2",
+   "시계": "UI_RelicIcon_10004_5",
+   "성배": "UI_RelicIcon_10004_1",
+   "왕관": "UI_RelicIcon_10004_3"
+  },
+  "행자의 마음": {
+   "꽃": "UI_RelicIcon_10001_4",
+   "깃털": "UI_RelicIcon_10001_2",
+   "시계": "UI_RelicIcon_10001_5",
+   "성배": "UI_RelicIcon_10001_1",
+   "왕관": "UI_RelicIcon_10001_3"
+  },
+  "떠돌이 의사": {
+   "꽃": "UI_RelicIcon_10013_4",
+   "깃털": "UI_RelicIcon_10013_2",
+   "시계": "UI_RelicIcon_10013_5",
+   "성배": "UI_RelicIcon_10013_1",
+   "왕관": "UI_RelicIcon_10013_3"
+  },
+  "행운아": {
+   "꽃": "UI_RelicIcon_10011_4",
+   "깃털": "UI_RelicIcon_10011_2",
+   "시계": "UI_RelicIcon_10011_5",
+   "성배": "UI_RelicIcon_10011_1",
+   "왕관": "UI_RelicIcon_10011_3"
+  },
+  "모험가": {
+   "꽃": "UI_RelicIcon_10010_4",
+   "깃털": "UI_RelicIcon_10010_2",
+   "시계": "UI_RelicIcon_10010_5",
+   "성배": "UI_RelicIcon_10010_1",
+   "왕관": "UI_RelicIcon_10010_3"
+  }
+ },
+ "_missing": []
+}
