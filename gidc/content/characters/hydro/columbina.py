@@ -97,7 +97,12 @@ class Columbina(Character):
     name = "콜롬비나"
     weapon_type = WeaponType.CATALYST
     # 놋 크라이 출신 — 파티 달빛 징조에 기여한다.
-    innate_traits = frozenset({CharacterTrait.MOONSIGN})
+    # 파티에 있으면 감전 → 달감전, 결정 → 달결정으로 전환된다(core.reaction.lunar_candidates).
+    innate_traits = frozenset({
+        CharacterTrait.MOONSIGN,
+        CharacterTrait.LUNAR_CHARGED_CONVERTER,
+        CharacterTrait.LUNAR_CRYSTALLIZE_CONVERTER,
+    })
 
     #region ── 특성 계수 테이블 ─────────────────────────────────────────────────
     # 일반 공격 달빛 조석 (% ATK, L1~L11) — 물 원소, 최대 3단
@@ -179,7 +184,7 @@ class Columbina(Character):
     _A1_SEDUCTION_MAX_STACKS = 3
 
     # Moonsign : HP 최대치 1000pt마다 달빛 반응 '기본 피해' +0.2%, 최대 +7%
-    # (HP 35,000에서 상한) → lunar_reaction_base_dmg_bonus
+    # (HP 35,000에서 상한) → 달반응 3종의 *_base_dmg_bonus
     _MOONSIGN_BASE_DMG_PER_1000_HP = 0.002
     _MOONSIGN_BASE_DMG_CAP         = 0.07
 
@@ -400,15 +405,19 @@ class Columbina(Character):
         # HP를 더해 줄 수 있어 지금 확정하면 파티원 처리 순서가 결과를 바꾼다.
         source_hit = next(iter(all_hits[self].values()))
 
-        # Moonsign: 달빛 반응 '기본 피해' 증가 — 파티 전원의 달빛 반응에 적용된다.
+        # Moonsign: 달빛 반응 '기본 피해' 증가 — 파티 전원의 달빛 반응 **3종 모두**에 적용된다
+        # (원문: "파티 내 캐릭터가 주는 달빛 반응의 기본 피해가 증가"). 기초 피해 증가가
+        # 반응별 필드로 나뉘어 있으므로 세 자리에 모두 넣는다 — Q 「향수에 잠긴 달」이 반응
+        # 보너스를 셋에 넣는 것과 같다. 달감전에만 거는 이네파 Moonsign과 갈리는 자리다.
+        moonsign_base = lambda: min(
+            source_hit.current_hp() / 1000.0 * self._MOONSIGN_BASE_DMG_PER_1000_HP,
+            self._MOONSIGN_BASE_DMG_CAP,
+        )
         for char_hits in all_hits.values():
             for hit in char_hits.values():
-                hit.add(
-                    "lunar_reaction_base_dmg_bonus",
-                    lambda: min(source_hit.current_hp() / 1000.0 * self._MOONSIGN_BASE_DMG_PER_1000_HP,
-                                self._MOONSIGN_BASE_DMG_CAP),
-                    self, note="Moonsign",
-                )
+                hit.add("lunar_charged_base_dmg_bonus",     moonsign_base, self, note="Moonsign")
+                hit.add("lunar_bloom_base_dmg_bonus",       moonsign_base, self, note="Moonsign")
+                hit.add("lunar_crystallize_base_dmg_bonus", moonsign_base, self, note="Moonsign")
 
         # C4: 이번 간섭파의 달빛 반응 피해가 콜롬비나 HP 최대치의 12.5%/2.5%/12.5%만큼 증가.
         # 피해 자체를 키우는 효과라 flat_dmg_bonus로 넣는다(코어 풀이 아니므로 Phase 5에서 안전).

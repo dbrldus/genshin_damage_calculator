@@ -51,7 +51,11 @@ class Ineffa(Character):
     name = "이네파"
     weapon_type = WeaponType.POLEARM
     # 놋 크라이 출신 — 파티 달빛 징조에 기여한다.
-    innate_traits = frozenset({CharacterTrait.MOONSIGN})
+    # Moonsign 문구대로 파티 내 감전 반응이 달감전으로 전환된다 — 달결정은 전환하지 않는다.
+    innate_traits = frozenset({
+        CharacterTrait.MOONSIGN,
+        CharacterTrait.LUNAR_CHARGED_CONVERTER,
+    })
 
     #region ── 특성 계수 테이블 ─────────────────────────────────────────────────
     # 일반 공격 사이클론 더스터 (% ATK, L1~L11)
@@ -232,10 +236,12 @@ class Ineffa(Character):
         atk_per_100 = lambda: source_hit.current_atk() / 100.0
 
         # Moonsign: 달감전 '기본 피해' 증가 — 파티 전원의 달감전에 적용된다.
+        # 원문대로 **달감전에만** 걸린다. 콜롬비나 Moonsign이 달빛 반응 3종에 거는 것과
+        # 갈리는 자리라, 기초 피해 증가 필드가 반응별로 나뉘어 있다(profile.SkillHit).
         for char_hits in all_hits.values():
             for hit in char_hits.values():
                 hit.add(
-                    "lunar_reaction_base_dmg_bonus",
+                    "lunar_charged_base_dmg_bonus",
                     lambda: min(atk_per_100() * self._MOONSIGN_BASE_DMG_PER_100_ATK,
                                 self._MOONSIGN_BASE_DMG_CAP),
                     self, note="Moonsign",

@@ -28,6 +28,19 @@ let answers = {};
 // 파티가 바뀌어 불가능해진 선택은 엔진이 무반응으로 되돌려 보내므로(_selected_reaction)
 // 여기서 지우지 않는다. 버튼의 눌림 상태는 저장값이 아니라 엔진이 되돌려준 값으로 그린다.
 let hitReactions = {};
+// 달·별 반응의 치명타 — { 반응id: { 캐릭터명: true } }. 참여자마다 판정이 따로 굴러가므로
+// 파티 단위 스위치로 묶으면 「전원 크리」와 「전원 비크리」 두 조합만 표현된다.
+// 참여자가 바뀌어 사라진 이름은 엔진이 무시하므로(_crit_chars) 여기서 지우지 않는다.
+// 계열마다 따로 둔다 — 달감전과 별 확산은 서로 다른 피해 인스턴스다.
+let lunarCrits = {};
+let stellarCrits = {};
+// 파티 공용 반응 계열. 키는 엔진의 damage 딕셔너리 키이자 설명 payload 의 kind 값이다
+// (web_api._PARTY_REACTION_FAMILIES와 같은 키를 쓴다). 계열이 늘면 여기 한 줄만 추가한다.
+const PARTY_REACTIONS = [
+  { kind: "lunar",   label: "달반응",  crits: () => lunarCrits },
+  { kind: "stellar", label: "별 반응", crits: () => stellarCrits },
+];
+const partyReactionFamily = (kind) => PARTY_REACTIONS.find((f) => f.kind === kind);
 // 데미지 표에 보일 캐릭터. null = 아직 손대지 않음 = 파티 전원(파티원이 늘면 같이 는다).
 // 칩을 한 번이라도 건드리면 Set 으로 굳고, 그 뒤로는 새 파티원이 저절로 끼어들지 않는다 —
 // 딜러 둘을 나란히 보려고 골라 뒀는데 버퍼를 넣었다고 표가 흔들리면 곤란하다.
@@ -99,7 +112,7 @@ function sheet(extra = {}) {
     // 캐릭터 레벨은 여기서 보내지 않는다 — 방어력/반응 레벨 배율은 때리는 캐릭터
     // 자신의 레벨로 정해지므로 엔진이 party[i].level 을 직접 읽는다. 하나로 뭉치면
     // 레벨이 섞인 파티에서 틀리고, Lv.80 을 90 으로 계산하면 피해가 2.78% 부풀려진다.
-    settings: { hitReactions, targets: selectedTargets(), ...extra },
+    settings: { hitReactions, lunarCrits, stellarCrits, targets: selectedTargets(), ...extra },
   };
 }
 
@@ -228,14 +241,11 @@ function renderParty() {
   // 프리셋으로 넣으면 남이 짜 둔 빌드가 딸려 와서, 내 빌드를 넣으려면 먼저 지워야 한다.
   // 목록은 등록된 캐릭터 전부다 (프리셋이 있든 없든).
   if (party.length < MAX_PARTY) {
-    const add = make("select");
-    add.add(new Option("+ 캐릭터 추가", ""));
-    for (const c of reg.characters) add.add(new Option(c.name, c.name));
-    add.onchange = () => {
-      if (!add.value) return;
-      party.push(unwrap(api.blank_sheet(add.value)));
+    const add = make("button", { type: "button", textContent: "+ 캐릭터 추가" });
+    add.onclick = () => openCharPicker(null, (name) => {
+      party.push(unwrap(api.blank_sheet(name)));
       structuralChange();
-    };
+    });
     box.append(make("div", { className: "slot" }, add));
   }
 
@@ -315,6 +325,80 @@ function iconOf(kind, name, slot) {
   if (!key) return null;
   return { url: (kind === "artifacts" ? RELIC_URL : ICON_URL) + key + ".png",
            alt: ICON_ALT + key + ".png" };
+}
+
+// ── 캐릭터 선택 창 ───────────────────────────────────────────────────────
+// [+ 캐릭터 추가]와 빌드 편집 창의 캐릭터 교체가 함께 쓴다. 드롭다운 대신 초상화
+// 격자로 고르게 하는 이유: 이름만으로는 어느 캐릭터인지 한눈에 안 들어오고,
+// 목록이 길어질수록(지금도 14명) 스크롤하며 글자를 읽는 쪽이 더 느리다.
+let charPickerCurrent = null;   // 지금 이 슬롯에 있는 캐릭터 — 격자에서 테두리로 표시
+let charPickerOnPick = null;    // (name) => void — 고른 뒤 부를 콜백
+
+function openCharPicker(current, onPick) {
+  charPickerCurrent = current;
+  charPickerOnPick = onPick;
+  $("charpickersearch").value = "";
+  renderCharPicker("");
+  $("charpicker").showModal();
+  $("charpickersearch").focus();
+}
+
+function closeCharPicker() {
+  charPickerOnPick = null;
+  $("charpicker").close();
+}
+
+// 5성/4성만 있고 3성 이하는 없다 — 성급별 배경 색만 갈라 둔다(실제 게임의 금색/보라 카드 느낌).
+const RARITY_BG = {
+  5: ["#8a6a2f", "#4a3813"],
+  4: ["#6a4f8a", "#382a4a"],
+};
+
+function renderCharPicker(filter) {
+  const grid = $("charpickergrid");
+  grid.innerHTML = "";
+  const q = filter.trim().toLowerCase();
+  const list = reg.characters.filter((c) => !q || c.name.toLowerCase().includes(q));
+
+  if (!list.length) {
+    grid.append(make("div", { className: "cp-empty", textContent: "일치하는 캐릭터가 없습니다." }));
+    return;
+  }
+
+  for (const c of list) {
+    const btn = make("button", {
+      type: "button",
+      className: "cp-item" + (c.name === charPickerCurrent ? " cur" : ""),
+      title: c.name,
+    });
+    btn.style.setProperty("--ec", ELEMENT_COLOR[c.element] || "#8a8a8a");
+    const [bg1, bg2] = RARITY_BG[c.rarity] || RARITY_BG[4];
+    btn.style.setProperty("--cp-bg1", bg1);
+    btn.style.setProperty("--cp-bg2", bg2);
+
+    const src = iconOf("characters", c.name);
+    if (src) {
+      const img = make("img", { alt: "", loading: "lazy", decoding: "async" });
+      img.dataset.alt = src.alt;
+      // 카드 타일의 tile()과 같은 이유 — CDN이 죽어도 격자 칸의 크기·이름표는 남는다.
+      img.onerror = () => {
+        if (img.dataset.alt) { img.src = img.dataset.alt; img.dataset.alt = ""; return; }
+        img.remove();
+      };
+      img.src = src.url;
+      btn.append(img);
+    }
+    btn.append(
+      make("span", { className: "badge", textContent: c.element.slice(0, 1) }),
+      make("span", { className: "label", textContent: c.name }));
+
+    btn.onclick = () => {
+      const fn = charPickerOnPick;
+      closeCharPicker();
+      if (fn) fn(c.name);
+    };
+    grid.append(btn);
+  }
 }
 
 function buildCard(c, i) {
@@ -526,11 +610,12 @@ function buildEditor(c) {
   c.artifacts = c.artifacts || {};
   const d = make("div");
 
-  // 캐릭터 교체. 카드에는 이름만 있고 드롭다운이 없어서(카드는 보여주기만 한다)
-  // 슬롯의 캐릭터를 바꾸는 자리는 여기다.
-  const swap = opt(reg.characters, c.character, (x) => x.name, (x) => x.name);
+  // 캐릭터 교체. 카드에는 이름만 있고 고르는 자리가 없어서(카드는 보여주기만 한다)
+  // 슬롯의 캐릭터를 바꾸는 자리는 여기다. 버튼을 누르면 [+ 캐릭터 추가]와 같은
+  // 초상화 선택 창이 뜬다.
+  const swap = make("button", { type: "button", textContent: c.character });
   swap.title = "이 슬롯의 캐릭터를 바꾼다 (빌드는 맨몸으로 다시 시작한다)";
-  swap.onchange = () => { swapCharacter(editing, swap.value); };
+  swap.onclick = () => openCharPicker(c.character, (name) => { swapCharacter(editing, name); });
   d.append(make("div", { className: "art-share" },
     make("span", { className: "name", textContent: "캐릭터" }), swap));
 
@@ -1019,7 +1104,7 @@ function recalc() {
   // 엔진은 빈 targets 를 「전원」으로 읽는다(_damage). 하나도 안 고른 상태를 그쪽에
   // 표현할 방법이 없어서 그 한 경우만 여기서 비운다.
   const picked = selectedTargets();
-  renderDamage(picked.length ? out.damage : []);
+  renderDamage(picked.length ? out.damage : { chars: [], lunar: [], stellar: [] });
 
   const who = !picked.length ? "선택 없음"
             : picked.length === partyNames().length ? "전원"
@@ -1160,7 +1245,7 @@ function renderDamage(damage) {
   const box = $("damage");
   box.innerHTML = "";
 
-  for (const block of damage) {
+  for (const block of damage.chars) {
     box.append(make("div", { className: "dmg-char", textContent: block.char }));
 
     box.append(buildTable(["히트", "반응", "비크리", "크리", "기댓값"],
@@ -1194,6 +1279,56 @@ function renderDamage(damage) {
         tr.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } };
       }, 2));
   }
+
+  for (const fam of PARTY_REACTIONS) renderPartyReaction(box, damage[fam.kind], fam);
+}
+
+// 파티 공용 반응 피해(달반응·별 반응)는 캐릭터 블록 밖에 둔다 — 트리거할 수 있는 파티원
+// 여럿이 각자 피해를 넣고 그 가중합이 파티의 값이라, 누구 한 명의 블록에 넣으면 그 사람이
+// 낸 피해로 읽힌다.
+// 행이 비어 있으면 아무것도 그리지 않는다(전환 캐릭터가 없거나, 트리거를 아직 안 골랐다).
+// 별 초전도는 여기 뜨지 않는다 — 반응 피해가 없어 엔진이 후보에서 빼기 때문이다
+// (core.reaction.stellar_candidates). 초전도 행이 사라진 것은 별 초전도가 그것을 대체해서다.
+function renderPartyReaction(box, rows, fam) {
+  if (!rows || !rows.length) return;
+
+  box.append(make("div", { className: "dmg-char", textContent: `${fam.label} (파티 공용)` }));
+  box.append(make("div", { className: "dmg-sub",
+    textContent: "반응 피해 (1회당, 트리거 가능한 파티원의 가중합)" }));
+  // 「비크리/크리」 두 열을 두지 않는 이유: 치명타가 참여자마다 따로 굴러가므로 그 둘은
+  // 2^N 조합 중 양 끝 하나씩일 뿐이다. 대신 조합을 직접 고르게 하고(치명타 열),
+  // 고른 값(선택 피해)과 확률 기댓값을 나란히 둔다.
+  box.append(buildTable(["반응", "피해 원소", "치명타", "선택 피해", "기댓값"],
+    rows.map((r) => [r.label, r.element, critPicker(r, fam), num(r.selected), num(r.expected)]),
+    (tr, i) => {
+      const open = () => openExplainPartyRow(rows[i], fam.kind);
+      tr.className = "hit";
+      tr.tabIndex = 0;
+      tr.title = "누가 얼마씩 넣었는지 보기";
+      // 치명타 버튼은 행 클릭을 타고 올라가 설명 창까지 열지 않도록 막는다(히트 표와 같다).
+      tr.onclick = (e) => { if (!e.target.closest("button")) open(); };
+      tr.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } };
+    }, 2));
+}
+
+// 참여자마다 치명타 토글 하나. 눌러 켜진 사람만 터진 것으로 계산한다.
+// 눌림 상태는 저장값이 아니라 엔진이 되돌려준 share.critOn 으로 그린다 — 참여자가 바뀌어
+// 사라진 이름이 남아 있어도 화면이 거짓말을 하지 않는다(reactionPicker와 같은 이유).
+function critPicker(r, fam) {
+  const box = make("span", { className: "rx" });
+  const crits = fam.crits();
+  for (const s of r.shares) {
+    const b = make("button", { type: "button", className: "mini", textContent: s.char });
+    if (s.critOn) b.classList.add("on");
+    b.title = `${s.char} 치명타 ${s.critOn ? "켜짐" : "꺼짐"} — 비크리 ${num(s.nonCrit)} / 크리 ${num(s.crit)}`;
+    b.onclick = () => {
+      if (!crits[r.reaction]) crits[r.reaction] = {};
+      crits[r.reaction][s.char] = !s.critOn;
+      recalc();
+    };
+    box.append(b);
+  }
+  return box;
 }
 
 // 이 히트에 붙일 수 있는 반응 버튼. 후보는 엔진이 히트 원소와 파티 구성에서 유도해 준다
@@ -1248,8 +1383,33 @@ const openExplainReaction = (char, r) =>
   runExplain(char, `${r.label} · ${r.element} 피해`,
              { explainReaction: { char, reaction: r.reaction, element: r.element } });
 
+// 달·별 반응 행은 파티 공용이라 「누구의 설명인가」가 없다. char 는 **어느 참여자의 상세를
+// 볼지**를 고르는 값이고, 데미지 표에서 처음 열 때는 가중치가 가장 큰 참여자를 준다
+// (shares 는 피해 내림차순이다). 창 안의 참여자 표에서 다시 열면 그 사람으로 바뀐다.
+//
+// kind 는 계열을 가른다 — 엔진이 그것으로 후보 유도와 컨텍스트 빌더를 고르므로, 표에 있던
+// 그 행과 같은 계열을 넘겨야 같은 숫자가 나온다(web_api._PARTY_REACTION_FAMILIES).
+//
+// title 을 부르는 쪽이 만드는 이유: 처음 열 때는 아직 페이로드가 없어 표의 행에서 짜야
+// 하고, 다시 열 때는 페이로드의 ex.hit 이 이미 같은 문구다. 두 경로의 제목이 달라지면
+// 같은 창인데 이름이 바뀐 것처럼 보인다.
+const openExplainParty = (kind, reaction, title, element, char) =>
+  runExplain(char, title,
+             { explainReaction: { kind, char, reaction, element } });
+
+// 처음 열 때 보여줄 상세의 주인은 순위 배수가 가장 큰 사람이다. shares 는 파티 순서라
+// 첫 원소가 1등이 아니다 — 순위는 weight 가 말한다(치명타 선택에 따라 옮겨 다닌다).
+const openExplainPartyRow = (r, kind) => openExplainParty(
+  kind, r.reaction, `${r.label} (${r.element} 피해)`, r.element,
+  r.shares.length ? r.shares.reduce((a, b) => (b.weight > a.weight ? b : a)).char : null);
+
+// 파티 공용 반응 계열인지 — 달반응이든 별 반응이든 창의 모양이 같다(가중합 + 참여자 표).
+const isPartyReaction = (ex) => !!ex && PARTY_REACTIONS.some((f) => f.kind === ex.kind);
+
 function renderExplain(char, title, ex) {
-  $("explaintitle").textContent = `${char} · ${title}`;
+  const partyRow = isPartyReaction(ex);
+  // 파티 공용이라 앞에 사람 이름을 세우면 그 사람이 낸 피해로 읽힌다.
+  $("explaintitle").textContent = partyRow ? `${title} · 파티 가중합` : `${char} · ${title}`;
   const body = $("explainbody");
   body.innerHTML = "";
 
@@ -1262,12 +1422,22 @@ function renderExplain(char, title, ex) {
   }
 
   const reaction = ex.kind === "reaction";
+  // 맨 위 숫자는 **표에 있던 그 숫자**여야 한다 — 파티 공용 반응 행은 가중합이고, ex.result 는
+  // 아래 상세의 주인 한 명 몫이라 다른 값이다. 이 계열은 비크리/크리 대신 「고른 조합」과
+  // 기댓값을 적고, 양 끝값(전원 비크리 ~ 전원 크리)을 범위로 덧붙인다.
   const r = ex.result;
-  body.append(make("div", { className: "ex-res",
-    textContent: `비크리 ${num(r.nonCrit)} · 크리 ${num(r.crit)} · 기댓값 ${num(r.expected)}` }));
+  body.append(make("div", { className: "ex-res", textContent: partyRow
+    ? `선택 피해 ${num(ex.total.selected)} · 기댓값 ${num(ex.total.expected)}`
+    : `비크리 ${num(r.nonCrit)} · 크리 ${num(r.crit)} · 기댓값 ${num(r.expected)}` }));
+  if (partyRow) {
+    body.append(make("div", { className: "ex-kind",
+      textContent: `치명타 조합의 범위: 전원 비크리 ${num(ex.total.allNonCrit)} ~ 전원 크리 ${num(ex.total.allCrit)}` }));
+  }
   // 어떤 보너스가 왜 안 걸리는지는 결국 이 줄로 갈린다 (원소 없는 평타 = 물리라 냉기 보너스가 안 붙는다).
   // 격변은 스킬 종류가 없는 대신, 버프 원장을 어느 히트에서 읽었는지를 밝힌다.
-  body.append(make("div", { className: "ex-kind", textContent: reaction
+  body.append(make("div", { className: "ex-kind", textContent: partyRow
+    ? `${ex.element} 피해 · ${partyReactionFamily(ex.kind).label} (파티 가중합)`
+    : reaction
     ? `${ex.element} 피해 · 격변 반응 (버프는 「${ex.carrier}」에서 읽음)`
     : `${ex.element} · ${ex.skillType}` }));
 
@@ -1276,15 +1446,50 @@ function renderExplain(char, title, ex) {
     body.append(make("div", { className: "ex-note", textContent:
       "격변은 계수·스탯·%피해 보너스·방어력 배율을 타지 않는다. 원마·반응 보너스·내성만 걸린다." }));
   }
+  if (partyRow) {
+    const label = partyReactionFamily(ex.kind).label;
+    body.append(make("div", { className: "ex-note", textContent:
+      `${label} 피해는 트리거할 수 있는 파티원 각자의 피해를 가중합한 값이다. 계수·스탯·%피해 보너스·방어력 배율은 타지 않고, 원마·${label} 기초 피해 증가·반응 피해 보너스·고저차가 걸린다. 치명타는 참여자마다 따로 굴러가므로 누가 터졌는지는 데미지 표의 치명타 버튼에서 고른다 — 가중치는 지분이 아니라 순위 배수라서, 크리로 피해 대소가 역전되면 1등 배수도 그 사람에게 옮겨간다.` }));
+    body.append(shareSection(ex));
+  }
 
-  const noun = reaction ? "반응" : "히트";
-  body.append(section("공식 — 이 순서로 곱해져 숫자가 됐다", formulaTable(ex.formula)));
+  const noun = reaction || partyRow ? "반응" : "히트";
+  body.append(section(partyRow
+    ? `공식 — 「${ex.char}」 몫이 이렇게 계산됐다 (가중치 적용 전)`
+    : "공식 — 이 순서로 곱해져 숫자가 됐다", formulaTable(ex.formula)));
   if (ex.stats.length) body.append(applySection("스탯 조립", ex.stats, statBlock, noun));
   for (const g of ex.groups) body.append(applySection(g.label, g.fields, fieldBlock, noun));
 }
 
 function section(title, ...kids) {
   return make("div", { className: "ex-sec" }, make("h3", { textContent: title }), ...kids);
+}
+
+// 가중치 내역 — 누가 어떤 순위 배수로 얼마를 넣었는지. 아래 상세는 이 중 한 명의 것이므로
+// 행을 눌러 주인을 바꿀 수 있다(현재 주인은 굵게 표시).
+// 배수는 「선택 피해」 내림차순 순위로 붙고 정규화하지 않는다(1등 100%, 2등 50%, 3·4등 8.3%).
+// 행 순서는 파티 순서로 고정이다 — 순위는 가중치 열이 말한다. 합계를 적는 이유는 이 값이
+// 지분이 아니라 배수라서 합이 1이 아니라는 사실이 보여야 하기 때문이다.
+function shareSection(ex) {
+  const shares = ex.shares || [];
+  const sum = shares.reduce((a, s) => a + s.weight, 0);
+  // 치명타 열은 여기서는 **읽기 전용**이다 — 토글은 데미지 표에 있다. 창 안에 또 두면
+  // 같은 값을 두 군데서 바꾸게 되고, 창을 다시 그릴 때마다 초점이 튄다.
+  const t = buildTable(["캐릭터", "순위 배수", "치명타", "비크리", "크리", "선택 피해", "기여"],
+    shares.map((s) => [s.char, pct(s.weight), s.critOn ? "터짐" : "—",
+                       num(s.nonCrit), num(s.crit), num(s.selected),
+                       num(s.weight * s.selected)]),
+    (tr, i) => {
+      const s = shares[i];
+      tr.className = s.char === ex.char ? "hit on" : "hit";
+      tr.tabIndex = 0;
+      tr.title = `「${s.char}」 몫의 근거 보기`;
+      // 반응 식별자는 페이로드가 갖고 있다 — 표시명에서 되짚지 않는다.
+      const open = () => openExplainParty(ex.kind, ex.reaction, ex.hit, ex.element, s.char);
+      tr.onclick = open;
+      tr.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } };
+    }, 2);
+  return section(`참여자 순위 배수 (합 ${pct(sum)} — 지분이 아니라 배수라 1이 아니다)`, t);
 }
 
 // 이 히트(반응)에 실제로 들어가는 것만 펼치고, 나머지는 접어 둔다.
@@ -1372,6 +1577,9 @@ $("sharecopy").onclick = async () => {
 $("explainclose").onclick = () => $("explain").close();
 $("editorclose").onclick = () => closeEditor();
 $("editor").addEventListener("close", () => { editing = null; });   // Esc로 닫힌 경우
+$("charpickerclose").onclick = () => closeCharPicker();
+$("charpicker").addEventListener("close", () => { charPickerOnPick = null; });   // Esc로 닫힌 경우
+$("charpickersearch").oninput = (e) => renderCharPicker(e.target.value);
 $("reset").onclick = () => { answers = {}; recalc(); };
 $("enemylv").onchange = (e) => { enemyLevel = Number(e.target.value); recalc(); };
 wireTabs();

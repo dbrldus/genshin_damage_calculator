@@ -6,6 +6,7 @@ from gidc.enums import DmgType, Element, ReactionType
 from gidc.enums import StatType
 from gidc.core.damage import DamageContext
 from gidc.core.enemy import Enemy
+from gidc.core.stellar import stellar_multiplier
 
 # ── 디버그: 버프 기여 원장(explain_hit) ──────────────────────────────────────
 # 각 히트 필드에 '누가 얼마를' 넣었는지 기록한다. 평상시엔 꺼져 있어(_RECORD_ENABLED=False)
@@ -174,8 +175,20 @@ class SkillHit:
     #endregion
 
 
-    lunar_reaction_base_dmg_bonus: float = 0.0
-    
+    # 달,별 반응 기본 피해 증가
+    lunar_charged_base_dmg_bonus:     float = 0.0
+    lunar_bloom_base_dmg_bonus:       float = 0.0
+    lunar_crystallize_base_dmg_bonus: float = 0.0
+    stellar_conduct_base_dmg_bonus:   float = 0.0
+    stellar_swirl_base_dmg_bonus:     float = 0.0
+
+    # 별 반응 계수의 재료. 계수 자체는 여기 두지 않는다 — core.stellar의 함수가 만든다
+    # (결과값을 담아 두면 재료가 바뀌었는데 값이 안 따라온다).
+    # 파티 단위 유저 입력이며 party._ask_stellar_state가 모든 히트에 실어 준다.
+    # elevation_multiplier와 같은 성격 — 버프가 아니라 로테이션 서술자다.
+    stellar_recorded_hits: float = 0.0   # 기록된 얼음·번개 히트 수 (별 초전도)
+    stellar_gust_level:    float = 0.0   # 별빛 돌풍 레벨 0/1/2 (별 확산)
+
     # ── 반응별 피해 보너스 ───────────────────────────────────────────────────
     #region
     vaporize_bonus:          float = 0.0
@@ -194,6 +207,8 @@ class SkillHit:
     lunar_charged_bonus:     float = 0.0
     lunar_bloom_bonus:       float = 0.0
     lunar_crystallize_bonus: float = 0.0
+    stellar_conduct_bonus:   float = 0.0
+    stellar_swirl_bonus:     float = 0.0
     #endregion
 
     # ── 반응별 치명타 스탯 ─────────────────────────────────────────────────
@@ -226,6 +241,7 @@ class SkillHit:
     spread_crit_dmg:             float = 0.0
     # 달반응(달감전/달개화/달결정)에는 반응 전용 추가 치명타 옵션이 게임에 존재하지 않는다.
     # 달반응 피해는 캐릭터 본인의 crit_rate/crit_dmg로 치명타 판정하므로 전용 필드를 두지 않는다.
+    # 별 반응도 같다 — 계산식이 달반응과 동일하다.
     #endregion
 
     # ── 방어력 감소 / 무시 / 배율 ──────────────────────────────────────────
@@ -528,6 +544,8 @@ _REACTION_PREFIX: dict[ReactionType, str] = {
     ReactionType.LUNAR_CHARGED:     "lunar_charged",
     ReactionType.LUNAR_BLOOM:       "lunar_bloom",
     ReactionType.LUNAR_CRYSTALLIZE: "lunar_crystallize",
+    ReactionType.STELLAR_CONDUCT:   "stellar_conduct",
+    ReactionType.STELLAR_SWIRL:     "stellar_swirl",
 }
 
 # StatType → 누산 대상 SkillHit 필드명
@@ -580,6 +598,26 @@ def skill_dmg_field(skill_type: SkillType) -> str | None:
 def reaction_bonus_field(reaction_type: ReactionType) -> str | None:
     prefix = _REACTION_PREFIX.get(reaction_type)
     return f"{prefix}_bonus" if prefix else None
+
+
+def celestial_base_dmg_bonus_field(reaction_type: ReactionType) -> str | None:
+    """달·별 반응의 **기초 피해 증가** 필드 이름. 반응별로 나뉘어 있어 고를 자리가 필요하다.
+
+    그 이름을 여러 곳에 손으로 적으면 한쪽만 고쳐져 「설명 화면에 적용됨으로 떴는데 공식에는
+    안 곱해지는」 사고가 난다 — 컨텍스트 빌더 셋과 {lunar,stellar}_reaction_input_fields·
+    damage_input_fields가 모두 이 함수를 읽는다.
+
+    달·별이 아닌 반응(증발·격변 등)은 None이다. 그쪽 _calc_*가 이 값을 아예 읽지 않는다.
+    """
+    if reaction_type not in _CELESTIAL_REACTIONS:
+        return None
+    return f"{_REACTION_PREFIX[reaction_type]}_base_dmg_bonus"
+
+
+def _celestial_base_dmg_bonus(hit: SkillHit, reaction_type: ReactionType) -> float:
+    """공식의 (1 + %기초 피해 증가) 자리에 들어갈 값. 그 반응 전용 필드를 골라 읽는다."""
+    field = celestial_base_dmg_bonus_field(reaction_type)
+    return getattr(hit, field) if field else 0.0
 
 
 def element_res_reduction_field(element: Element) -> str:
@@ -643,6 +681,25 @@ _LUNAR_MULT: dict[ReactionType, dict[DmgType, float]] = {
 # 달반응 3종 — dmg_type이 두 자리(LUNAR_DIRECT/LUNAR_REACTION) 모두 유효한 유일한 반응.
 _LUNAR_REACTIONS = frozenset(_LUNAR_MULT)
 
+# 별 반응 2종. 달반응처럼 dmg_type 두 자리(STELLAR_DIRECT/STELLAR_REACTION)가 모두 유효하다.
+#
+# **배율 상수표가 없다.** 별 반응 계수는 런타임 상태(기록 히트 수·별빛 돌풍 레벨)로 변하므로
+# core.stellar의 함수가 유일한 출처다(_reaction_multiplier의 별 반응 분기). 여기에 표를
+# 하나 더 두면 같은 계수가 두 군데 적혀 갈라진다.
+_STELLAR_REACTIONS = frozenset({
+    ReactionType.STELLAR_CONDUCT,
+    ReactionType.STELLAR_SWIRL,
+})
+
+# 달·별 반응 — dmg_type을 반응 타입만으로 유도할 수 없는 계열. 두 자리가 모두 유효하다.
+_CELESTIAL_REACTIONS = _LUNAR_REACTIONS | _STELLAR_REACTIONS
+
+# 계열 → 그 계열에서 유효한 (직접 피해, 반응 피해) dmg_type 짝.
+_CELESTIAL_DMG_TYPES: dict[ReactionType, tuple[DmgType, DmgType]] = {
+    **{r: (DmgType.LUNAR_DIRECT,   DmgType.LUNAR_REACTION)   for r in _LUNAR_REACTIONS},
+    **{r: (DmgType.STELLAR_DIRECT, DmgType.STELLAR_REACTION) for r in _STELLAR_REACTIONS},
+}
+
 # reaction_type → dmg_type. 달반응을 제외하면 반응 타입이 계산식을 유일하게 결정한다.
 _REACTION_DMG_TYPE: dict[ReactionType, DmgType] = {
     ReactionType.NONE:           DmgType.NONE,
@@ -671,7 +728,7 @@ def resolve_reaction(
 
     · 히트가 내재 반응을 선언했으면(달감전 피해 등) 그것을 쓴다 — 전역 스위치로 덮이지 않는다.
     · 선언하지 않은 히트(대부분의 평타/스킬)에만 호출자가 넘긴 상황적 반응이 적용된다.
-    · dmg_type이 없으면 _REACTION_DMG_TYPE에서 유도하고, 달반응은 유도 불가라 명시를 요구한다.
+    · dmg_type이 없으면 _REACTION_DMG_TYPE에서 유도하고, 달·별 반응은 유도 불가라 명시를 요구한다.
     """
     if hit.reaction_type is not ReactionType.NONE:
         rt, dt = hit.reaction_type, hit.dmg_type
@@ -680,10 +737,12 @@ def resolve_reaction(
         dt = dmg_type
 
     if dt is None:
-        if rt in _LUNAR_REACTIONS:
+        if rt in _CELESTIAL_REACTIONS:
+            direct, reaction = _CELESTIAL_DMG_TYPES[rt]
+            family = "달반응" if rt in _LUNAR_REACTIONS else "별 반응"
             raise ValueError(
-                f"달반응('{rt.value}')은 dmg_type을 유도할 수 없습니다. "
-                f"직접 피해는 DmgType.LUNAR_DIRECT, 반응 피해는 DmgType.LUNAR_REACTION을 "
+                f"{family}('{rt.value}')은 dmg_type을 유도할 수 없습니다. "
+                f"직접 피해는 DmgType.{direct.name}, 반응 피해는 DmgType.{reaction.name}을 "
                 f"히트에 명시하세요 (SkillHit(..., reaction_type=..., dmg_type=...))."
             )
         try:
@@ -698,11 +757,14 @@ def resolve_reaction(
 
 def _validate_pair(reaction_type: ReactionType, dmg_type: DmgType) -> None:
     """(반응, 계산식) 짝이 유효한지 확인한다 — 잘못된 조합은 조용히 오답을 내므로 즉시 실패시킨다."""
-    if reaction_type in _LUNAR_REACTIONS:
-        if dmg_type not in (DmgType.LUNAR_DIRECT, DmgType.LUNAR_REACTION):
+    if reaction_type in _CELESTIAL_REACTIONS:
+        allowed = _CELESTIAL_DMG_TYPES[reaction_type]
+        if dmg_type not in allowed:
+            family = "달반응" if reaction_type in _LUNAR_REACTIONS else "별 반응"
+            names = " 또는 ".join(dt.name for dt in allowed)
             raise ValueError(
-                f"달반응('{reaction_type.value}')의 dmg_type은 LUNAR_DIRECT 또는 "
-                f"LUNAR_REACTION이어야 합니다. (입력: {dmg_type!r})"
+                f"{family}('{reaction_type.value}')의 dmg_type은 {names}이어야 합니다. "
+                f"(입력: {dmg_type!r})"
             )
         return
 
@@ -724,10 +786,17 @@ _SCALING_STAT_ATTR: dict[ScalingStat, str] = {
 
 
 def _reaction_multiplier(
+    hit:           SkillHit,
     reaction_type: ReactionType,
     element:       Element,
     dmg_type:      DmgType,
 ) -> float:
+    """이 (반응, 피해 계열) 조합의 반응 배율.
+
+    hit을 받는 것은 **별 반응 때문**이다 — 별 반응 계수만 상수가 아니라 런타임 상태로
+    변하고(기록 히트 수·별빛 돌풍 레벨), 그 재료를 나르는 것이 히트다. 나머지 반응은
+    hit을 보지 않는다.
+    """
     if reaction_type in _REACTION_MULT_CONST:
         return _REACTION_MULT_CONST[reaction_type]
     if reaction_type == ReactionType.VAPORIZE:
@@ -736,6 +805,13 @@ def _reaction_multiplier(
         return 2.0 if element == Element.PYRO else 1.5
     if reaction_type in _LUNAR_MULT:
         return _LUNAR_MULT[reaction_type].get(dmg_type, 1.0)
+    if reaction_type in _STELLAR_REACTIONS:
+        # 상수표가 아니라 함수다 — core.stellar가 계수의 유일한 출처다.
+        return stellar_multiplier(
+            reaction_type, dmg_type,
+            recorded_hits = hit.stellar_recorded_hits,
+            gust_level    = hit.stellar_gust_level,
+        )
     return 1.0
 
 
@@ -753,7 +829,7 @@ def build_damage_context(
 
     reaction_type, dmg_type = resolve_reaction(hit, reaction_type, dmg_type)
 
-    reaction_multiplier = _reaction_multiplier(reaction_type, element, dmg_type)
+    reaction_multiplier = _reaction_multiplier(hit, reaction_type, element, dmg_type)
 
     if hit.stat_fn is not None:
         stat_value = hit.stat_fn(hit)
@@ -767,26 +843,27 @@ def build_damage_context(
     )
 
     return DamageContext(
-        stat_value                    = stat_value,
-        coeff                         = hit.coeff,
-        dmg_type                      = dmg_type,
-        coeff_amp                     = hit.coeff_amp,
-        flat_dmg_bonus                = hit.flat_dmg_bonus,
-        dmg_bonus                     = total_dmg_bonus,
-        crit_rate                     = hit.crit_rate,
-        crit_dmg                      = hit.crit_dmg,
-        char_level                    = char_level,
-        enemy_level                   = enemy.level,
-        enemy_resistance              = _enemy_resistance(hit, enemy, element),
-        def_reduction                 = hit.def_reduction,
-        def_ignore                    = hit.def_ignore,
-        elemental_mastery             = hit.elemental_mastery,
-        reaction_multiplier           = reaction_multiplier,
-        reaction_bonus                = _reaction_bonus(hit, reaction_type),
-        lunar_reaction_base_dmg_bonus = hit.lunar_reaction_base_dmg_bonus,
-        elevation_multiplier          = hit.elevation_multiplier,
-        reaction_crit_rate            = _reaction_crit_rate(hit, reaction_type),
-        reaction_crit_dmg             = _reaction_crit_dmg(hit, reaction_type),
+        stat_value               = stat_value,
+        coeff                    = hit.coeff,
+        dmg_type                 = dmg_type,
+        coeff_amp                = hit.coeff_amp,
+        flat_dmg_bonus           = hit.flat_dmg_bonus,
+        dmg_bonus                = total_dmg_bonus,
+        crit_rate                = hit.crit_rate,
+        crit_dmg                 = hit.crit_dmg,
+        char_level               = char_level,
+        enemy_level              = enemy.level,
+        enemy_resistance         = _enemy_resistance(hit, enemy, element),
+        def_reduction            = hit.def_reduction,
+        def_ignore               = hit.def_ignore,
+        elemental_mastery        = hit.elemental_mastery,
+        reaction_multiplier      = reaction_multiplier,
+        reaction_bonus           = _reaction_bonus(hit, reaction_type),
+        # 달·별 공용 슬롯 — 그 반응 전용 필드를 골라 담는다(_celestial_base_dmg_bonus).
+        celestial_base_dmg_bonus = _celestial_base_dmg_bonus(hit, reaction_type),
+        elevation_multiplier     = hit.elevation_multiplier,
+        reaction_crit_rate       = _reaction_crit_rate(hit, reaction_type),
+        reaction_crit_dmg        = _reaction_crit_dmg(hit, reaction_type),
     )
 
 
@@ -839,6 +916,172 @@ def build_transformative_context(
     )
 
 
+def build_lunar_reaction_context(
+    hit:        SkillHit,
+    enemy:      Enemy,
+    *,
+    reaction:   ReactionType,
+    element:    Element,
+    char_level: int = 90,
+) -> DamageContext:
+    """달반응 **반응 피해** 1회의 컨텍스트. hit은 격변과 같이 **스탯 캐리어**다.
+
+    build_transformative_context와 형제다 — 히트가 아니라 별도의 피해 인스턴스이고,
+    계수도 스탯 스케일도 %피해 보너스도 방어력 배율도 타지 않는다(_calc_lunar_reaction).
+    캐릭터마다 한 번 부르고, 캐리어로는 그 캐릭터의 히트 아무 것이나 넘기면 된다.
+
+    격변과 다른 점이 둘이다.
+      · 달반응은 반응 전용 치명타가 아니라 **캐릭터 치명타로 크리가 터진다** — 그래서
+        crit_rate/crit_dmg를 캐리어에서 읽는다(달반응에는 반응 전용 치명타 옵션이 없다).
+      · 기초 피해 증가(그 반응 전용 필드)와 elevation_multiplier를 읽는다.
+
+    호출자는 이 함수를 **파티원마다** 부르고 결과를 가중합한다(core.party_reaction).
+    element는 피해 원소이며 반응이 정한다 — core.reaction._LUNAR_RULES가 답을 갖고 있다.
+    """
+    return DamageContext(
+        # 계수도 스탯도 읽지 않는다. 0은 '없음'이 아니라 '이 경로가 쓰지 않는 자리'다.
+        stat_value = 0.0,
+        coeff      = 0.0,
+        dmg_type   = DmgType.LUNAR_REACTION,
+
+        # 캐리어의 flat_dmg_bonus는 직접 피해용이다 — _calc_lunar_reaction도 읽지 않는다
+        # (build_transformative_context의 같은 자리와 같은 이유).
+        flat_dmg_bonus = 0.0,
+
+        elemental_mastery   = hit.elemental_mastery,
+        reaction_multiplier = _LUNAR_MULT[reaction][DmgType.LUNAR_REACTION],
+        reaction_bonus      = _reaction_bonus(hit, reaction),
+
+        # 달·별 공용 슬롯에 이 반응 전용 필드를 담는다 — 별 반응 빌더와 같은 규약.
+        celestial_base_dmg_bonus = _celestial_base_dmg_bonus(hit, reaction),
+        elevation_multiplier     = hit.elevation_multiplier,
+
+        # 달반응은 캐릭터 치명타를 쓴다 — 격변과 갈리는 자리다.
+        crit_rate = hit.crit_rate,
+        crit_dmg  = hit.crit_dmg,
+
+        char_level = char_level,
+        # 적 기본 내성은 enemy에서, 내성 **감소**는 캐리어(= 트리거 캐릭터가 받은 버프)에서.
+        enemy_resistance = _enemy_resistance(hit, enemy, element),
+        # enemy_level·coeff_amp·dmg_bonus·def_*는 없다 — 이 경로가 읽지 않는다.
+    )
+
+
+def lunar_reaction_input_fields(
+    reaction: ReactionType,
+    element:  Element,
+) -> frozenset[str]:
+    """달반응 반응 피해 1회가 캐리어 히트에서 **실제로 읽는** 필드.
+    build_lunar_reaction_context와 짝이다 — 한쪽만 고치면 화면이 '적용됨'으로 띄운 항목이
+    실제로는 안 곱해진다.
+
+    damage_input_fields의 LUNAR_REACTION 분기를 돌려 쓰지 않는다.
+    transformative_input_fields가 적어 둔 이유와 같다 — resolve_reaction(hit, ...)을 부르므로
+    캐리어의 내재 반응(콜롬비나의 달감전 직접 피해)이 설명하려는 반응을 덮어쓰고, 피해 원소도
+    캐리어에서 유도해 내성 필드가 어긋난다.
+    """
+    # 계수·스탯·coeff_amp·%피해 보너스·flat_dmg_bonus·방어력 필드는 일부러 없다.
+    fields = {
+        element_res_reduction_field(element),
+        "elemental_mastery",
+        "elevation_multiplier",
+        # 격변과 달리 캐릭터 치명타를 쓴다.
+        "crit_rate", "crit_dmg",
+    }
+
+    # 기초 피해 증가는 그 반응 전용 필드 하나다 — 이름을 손으로 적으면 「달감전만」 올리는
+    # 버프(이네파 Moonsign)가 달개화 설명에 적용됨으로 뜬다.
+    base = celestial_base_dmg_bonus_field(reaction)
+    if base:
+        fields.add(base)
+
+    bonus = reaction_bonus_field(reaction)
+    if bonus:
+        fields.add(bonus)
+
+    return frozenset(fields)
+
+
+def build_stellar_reaction_context(
+    hit:        SkillHit,
+    enemy:      Enemy,
+    *,
+    reaction:   ReactionType,
+    element:    Element,
+    char_level: int = 90,
+) -> DamageContext:
+    """별 반응 **반응 피해** 1회의 컨텍스트. build_lunar_reaction_context의 쌍둥이다.
+
+    공식이 달반응과 같으므로(_calc_lunar_reaction) 이 함수가 다르게 하는 것은 하나뿐이다 —
+    반응 배율을 상수표가 아니라 core.stellar의 함수에서 가져온다. 별빛 돌풍 레벨로 변하는
+    값이라 표에 적어 둘 수 없다. 기초 피해 증가는 달반응도 반응별 필드라 같은 규칙을 탄다
+    (celestial_base_dmg_bonus_field).
+
+    현재 이 경로를 타는 반응은 별 확산뿐이다 — 별 초전도는 반응 피해가 없다
+    (stellar.stellar_has_reaction_damage). 그래도 반응을 인자로 받는 이유는, 계수와 필드를
+    반응에서 유도하는 구조를 유지해 두면 나중에 반응 피해가 있는 별 반응이 늘어도
+    이 함수를 고칠 일이 없기 때문이다.
+    """
+    return DamageContext(
+        # 계수도 스탯도 읽지 않는다 — build_lunar_reaction_context와 같은 규약.
+        stat_value = 0.0,
+        coeff      = 0.0,
+        dmg_type   = DmgType.STELLAR_REACTION,
+        flat_dmg_bonus = 0.0,
+
+        elemental_mastery   = hit.elemental_mastery,
+        reaction_multiplier = stellar_multiplier(
+            reaction, DmgType.STELLAR_REACTION,
+            recorded_hits = hit.stellar_recorded_hits,
+            gust_level    = hit.stellar_gust_level,
+        ),
+        reaction_bonus      = _reaction_bonus(hit, reaction),
+
+        # 달·별 공용 슬롯에 이 반응 전용 필드를 담는다 — 달반응 빌더와 같은 규약.
+        celestial_base_dmg_bonus = _celestial_base_dmg_bonus(hit, reaction),
+        elevation_multiplier     = hit.elevation_multiplier,
+
+        # 별 반응도 캐릭터 치명타를 쓴다 — 반응 전용 치명타 옵션이 없다.
+        crit_rate = hit.crit_rate,
+        crit_dmg  = hit.crit_dmg,
+
+        char_level = char_level,
+        enemy_resistance = _enemy_resistance(hit, enemy, element),
+    )
+
+
+def stellar_reaction_input_fields(
+    reaction: ReactionType,
+    element:  Element,
+) -> frozenset[str]:
+    """별 반응 반응 피해 1회가 캐리어 히트에서 **실제로 읽는** 필드.
+    build_stellar_reaction_context와 짝이다 — 한쪽만 고치면 화면이 '적용됨'으로 띄운 항목이
+    실제로는 안 곱해진다.
+
+    lunar_reaction_input_fields와 다른 자리는 하나뿐이다 — 계수의 **재료**(stellar_gust_level)도
+    넣는다. 이 값이 반응 배율을 바꾸므로 「이 숫자에 실제로 들어가는 것」에 해당한다. 넣지
+    않으면 화면이 계수가 왜 그 값인지 답할 수 없다.
+    """
+    fields = {
+        element_res_reduction_field(element),
+        "elemental_mastery",
+        "elevation_multiplier",
+        "crit_rate", "crit_dmg",
+        # 반응 배율의 재료. 별 초전도는 반응 피해가 없으므로 기록 히트 수는 여기 없다.
+        "stellar_gust_level",
+    }
+
+    base = celestial_base_dmg_bonus_field(reaction)
+    if base:
+        fields.add(base)
+
+    bonus = reaction_bonus_field(reaction)
+    if bonus:
+        fields.add(bonus)
+
+    return frozenset(fields)
+
+
 def transformative_input_fields(
     reaction: ReactionType,
     element:  Element,
@@ -877,7 +1120,13 @@ def transformative_input_fields(
 # 격변과 달반응은 반응 피해라 셋 다 안 받는다. 달반응 직접 피해는 계수×스탯만 쓴다.
 # damage.py의 _calc_* 와 어긋나면 화면에 '적용됨'으로 뜬 항목이 실제로는 안 곱해진다.
 _DIRECT_DMG_TYPES    = {DmgType.NONE, DmgType.AMPLIFY, DmgType.CATALYZE}
-_DMG_TYPES_WITH_STAT = _DIRECT_DMG_TYPES | {DmgType.LUNAR_DIRECT}
+_DMG_TYPES_WITH_STAT = _DIRECT_DMG_TYPES | {DmgType.LUNAR_DIRECT, DmgType.STELLAR_DIRECT}
+
+# 달·별 반응 계열의 dmg_type — (1 + %기초 피해 증가)와 고저차 배율을 읽는 경로.
+_CELESTIAL_DMG_TYPE_SET = {
+    DmgType.LUNAR_DIRECT,   DmgType.LUNAR_REACTION,
+    DmgType.STELLAR_DIRECT, DmgType.STELLAR_REACTION,
+}
 
 
 def damage_input_fields(
@@ -940,7 +1189,21 @@ def damage_input_fields(
         if bonus:
             fields.add(bonus)
 
-    if dmg_type in (DmgType.LUNAR_DIRECT, DmgType.LUNAR_REACTION):
-        fields |= {"lunar_reaction_base_dmg_bonus", "elevation_multiplier"}
+    if dmg_type in _CELESTIAL_DMG_TYPE_SET:
+        fields.add("elevation_multiplier")
+        # 기초 피해 증가는 그 반응 전용 필드 하나만 — build_damage_context가 담는 것과 같다
+        # (_celestial_base_dmg_bonus). 여럿 넣으면 안 곱해지는 항목이 '적용됨'으로 뜬다.
+        base = celestial_base_dmg_bonus_field(reaction_type)
+        if base:
+            fields.add(base)
+
+    # 별 반응 계수의 재료. 반응 배율을 바꾸는 값이라 이 숫자에 실제로 들어간다.
+    # 반응마다 재료가 다르므로 쓰는 것만 넣는다 — 별 초전도는 기록 히트 수,
+    # 별 확산은 별빛 돌풍 레벨이다(core.stellar.stellar_multiplier).
+    if reaction_type is ReactionType.STELLAR_CONDUCT:
+        fields.add("stellar_recorded_hits")
+    elif reaction_type is ReactionType.STELLAR_SWIRL:
+        if dmg_type is DmgType.STELLAR_REACTION:
+            fields.add("stellar_gust_level")   # 직접 피해 계수는 고정 1.0이라 재료가 없다
 
     return frozenset(fields)

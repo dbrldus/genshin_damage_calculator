@@ -29,6 +29,22 @@ class CharacterTrait(Enum):
     # 파티 전원이 물/얼음이고 물·얼음이 각각 최소 1명이면 파티 전원의 원소전투 스킬 레벨 +1
     MARTIAL_INSTRUCTION = "무예 전수"
 
+    # ── 달반응 전환 ───────────────────────────────────────────────────────
+    # 달빛 징조가 켜졌다고 감전·결정이 저절로 전환되는 것이 아니다 — 전환은 특정 캐릭터의
+    # 킷 효과이고, 그 캐릭터가 파티에 1명 이상 있어야 한다(core.reaction.lunar_candidates).
+    # 보유자를 이름 목록으로 어디에 적어두는 대신 캐릭터가 직접 선언한다 — 아래 미구현
+    # 캐릭터를 넣을 때 innate_traits에 이 특성을 함께 적으면 판정이 알아서 따라온다.
+    LUNAR_CHARGED_CONVERTER     = "달감전 전환"   # 콜롬비나·이네파·플린스(미구현)
+    LUNAR_CRYSTALLIZE_CONVERTER = "달결정 전환"   # 콜롬비나·자백(미구현)·린네아(미구현)
+
+    # ── 별 반응 전환 ──────────────────────────────────────────────────────
+    # 달반응과 같은 규약이다 — 전환은 특정 캐릭터의 킷 효과이고, 그 캐릭터가 파티에 1명 이상
+    # 있어야 한다(core.reaction.stellar_conditions). 두 별 반응의 보유자가 현재 같지만
+    # (산드로네·오데트) 특성을 하나로 합치지 않는다 — 한쪽만 전환하는 캐릭터가 나오면
+    # 합쳐 둔 특성은 쪼갤 수 없고, 달반응이 이미 반응별로 나눠 둔 선례가 있다.
+    STELLAR_CONDUCT_CONVERTER = "별 초전도 전환"   # 산드로네(미구현)·오데트(미구현)
+    STELLAR_SWIRL_CONVERTER   = "별 확산 전환"     # 산드로네(미구현)·오데트(미구현)
+
 
 class MoonsignLevel(Enum):
     NONE     = "없음"
@@ -54,6 +70,11 @@ class ReactionType(Enum):
     LUNAR_CHARGED     = "달감전"
     LUNAR_BLOOM       = "달개화"
     LUNAR_CRYSTALLIZE = "달결정"
+    # 별 반응. 확산 계열은 STELLAR_SWIRL이다 — 같은 반응의 별 계열 변종이므로 SWIRL과
+    # 같은 어휘를 쓴다. 다른 단어를 들여오면 「무엇이 무엇을 대체하는가」
+    # (core.reaction._STELLAR_SUPPRESSES)가 이름만 봐서는 안 보인다.
+    STELLAR_CONDUCT   = "별 초전도"
+    STELLAR_SWIRL     = "별 확산"
 
 
 class DmgType(Enum):
@@ -63,6 +84,11 @@ class DmgType(Enum):
     TRANSFORMATIVE = "transformative"
     LUNAR_DIRECT   = "lunar_direct"
     LUNAR_REACTION = "lunar_reaction"
+    # 별 반응도 직접 피해/반응 피해 두 자리가 있고 **공식은 달반응과 같다**
+    # (damage._DISPATCH가 같은 _calc_lunar_* 함수로 보낸다). 그래도 DmgType을 따로 두는
+    # 이유는 반응 배율과 기초 피해 증가 필드가 계열마다 다르기 때문이다.
+    STELLAR_DIRECT   = "stellar_direct"
+    STELLAR_REACTION = "stellar_reaction"
 
 
 # ══════════════════════════════════════════════════════════════════════════

@@ -48,9 +48,17 @@ class DamageContext:
 
     reaction_bonus: float = 0.0  # %Reaction Bonus (세트, 특성 등)
 
-    # ── 달반응 (Lunar Reaction) ───────────────────────────────────────
-    # %Lunar Reaction Base DMG Bonus — 공식: × (1 + %)
-    lunar_reaction_base_dmg_bonus: float = 0.0
+    # ── 달반응 / 별 반응 ──────────────────────────────────────────────
+    # %Celestial Base DMG Bonus — 공식: × (1 + %)
+    #
+    # 달·별 **공용 슬롯**이다. SkillHit 쪽은 반응마다 필드가 따로 있지만
+    # (lunar_charged/lunar_bloom/lunar_crystallize/stellar_conduct/stellar_swirl_base_dmg_bonus)
+    # 공식에 들어가는 자리는 하나이고, 어느 필드를 여기 담을지는 이 컨텍스트를 만드는
+    # profile.build_*_context가 이미 알고 있다(profile.celestial_base_dmg_bonus_field).
+    #
+    # 웹의 공식 트레이스 라벨은 "1+lunar_base" 그대로다 — 이 필드 이름과 묶여 있지 않은
+    # 별개의 문자열이고(web_api._FORMULA_LABELS의 키), 바꾸면 저장된 화면 순서가 흔들린다.
+    celestial_base_dmg_bonus: float = 0.0
     # Elevation Multiplier
     elevation_multiplier: float = 1.0
 
@@ -213,12 +221,17 @@ def _calc_lunar_direct(ctx: DamageContext, trace: list | None = None) -> DamageR
     """달반응 직접 피해: RM × 계수 × 스탯 × (1 + %Lunar Base) × (1 + %EM + %Reaction) × RES × Elevation × CRIT
 
     원소/스킬 피해 보너스(%DMG)는 곱해지지 않는다 — 달반응 직접 피해는 반응 피해 계열이라
-    일반 피해 보너스를 받지 않는다."""
+    일반 피해 보너스를 받지 않는다.
+
+    **별 반응 직접 피해(STELLAR_DIRECT)도 이 함수를 탄다** — 공식이 같다. 계열마다 다른 것은
+    RM과 기초 피해 증가 필드뿐이고, 둘 다 컨텍스트를 만드는 쪽에서 이미 정해져 들어온다.
+    공식을 복제하면 한쪽만 고쳐져 갈라지므로 나누지 않는다. 세 번째 계열이 생기는 순간이
+    이 함수 이름을 계열 중립으로 바꿀 시점이다."""
     em_bonus = em_lunar_bonus(ctx.elemental_mastery)
 
     base_dmg = (ctx.reaction_multiplier
                 * ctx.coeff * ctx.stat_value
-                * (1.0 + ctx.lunar_reaction_base_dmg_bonus)
+                * (1.0 + ctx.celestial_base_dmg_bonus)
                 * (1.0 + em_bonus + ctx.reaction_bonus)
                 ) + ctx.flat_dmg_bonus
 
@@ -228,7 +241,7 @@ def _calc_lunar_direct(ctx: DamageContext, trace: list | None = None) -> DamageR
     if trace is not None:
         _t(trace, "reaction_mult", ctx.reaction_multiplier)
         _t(trace, "coeff", ctx.coeff); _t(trace, "stat", ctx.stat_value)
-        _t(trace, "1+lunar_base", 1.0 + ctx.lunar_reaction_base_dmg_bonus)
+        _t(trace, "1+lunar_base", 1.0 + ctx.celestial_base_dmg_bonus)
         _t(trace, "em_bonus", em_bonus); _t(trace, "reaction_bonus", ctx.reaction_bonus)
         _t(trace, "1+em+reaction", 1.0 + em_bonus + ctx.reaction_bonus)
         _t(trace, "flat_dmg_bonus", ctx.flat_dmg_bonus)
@@ -237,13 +250,15 @@ def _calc_lunar_direct(ctx: DamageContext, trace: list | None = None) -> DamageR
 
 
 def _calc_lunar_reaction(ctx: DamageContext, trace: list | None = None) -> DamageResult:
-    """DMG = RM_Indirect × LvMult × (1 + %Lunar Base) × (1 + %EM + %Reaction) × Elevation × RES × CRIT"""
+    """DMG = RM_Indirect × LvMult × (1 + %Lunar Base) × (1 + %EM + %Reaction) × Elevation × RES × CRIT
+
+    별 반응 반응 피해(STELLAR_REACTION)도 이 함수를 탄다 — _calc_lunar_direct와 같은 이유다."""
     em_bonus = em_lunar_bonus(ctx.elemental_mastery)
     lv_mult  = LEVEL_MULTIPLIER[ctx.char_level]
     base_dmg = (
         ctx.reaction_multiplier
         * lv_mult
-        * (1.0 + ctx.lunar_reaction_base_dmg_bonus)
+        * (1.0 + ctx.celestial_base_dmg_bonus)
         * (1.0 + em_bonus + ctx.reaction_bonus)
     )
 
@@ -252,7 +267,7 @@ def _calc_lunar_reaction(ctx: DamageContext, trace: list | None = None) -> Damag
 
     if trace is not None:
         _t(trace, "reaction_mult", ctx.reaction_multiplier); _t(trace, "lv_mult", lv_mult)
-        _t(trace, "1+lunar_base", 1.0 + ctx.lunar_reaction_base_dmg_bonus)
+        _t(trace, "1+lunar_base", 1.0 + ctx.celestial_base_dmg_bonus)
         _t(trace, "em_bonus", em_bonus); _t(trace, "reaction_bonus", ctx.reaction_bonus)
         _t(trace, "res_mult", res_m); _t(trace, "elevation", ctx.elevation_multiplier)
     return _to_result(base_dmg, combined_mult, ctx.crit_rate, ctx.crit_dmg, trace)
@@ -267,6 +282,10 @@ _DISPATCH = {
     DmgType.LUNAR_DIRECT:   _calc_lunar_direct,
     DmgType.TRANSFORMATIVE: _calc_transformative,
     DmgType.LUNAR_REACTION: _calc_lunar_reaction,
+    # 별 반응은 달반응과 **같은 공식**을 탄다. 계열마다 다른 것은 반응 배율과 기초 피해 증가
+    # 필드뿐이고, 둘 다 profile.build_*_context가 컨텍스트에 담아 넘긴다.
+    DmgType.STELLAR_DIRECT:   _calc_lunar_direct,
+    DmgType.STELLAR_REACTION: _calc_lunar_reaction,
 }
 
 

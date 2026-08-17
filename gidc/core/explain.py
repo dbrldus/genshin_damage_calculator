@@ -1,4 +1,5 @@
-"""버프 귀속 디버그 — explain_hit(직접 피해) / explain_transformative(격변 반응 1회).
+"""버프 귀속 디버그 — explain_hit(직접 피해) / explain_transformative(격변 반응 1회) /
+explain_party_reaction(달·별 반응 반응 피해에서 참여자 한 명의 몫).
 
 '어떤 버프로 이 숫자가 나왔는지'를 두 층으로 설명한다:
   Layer 1 (버프 출처): 각 필드에 누가 얼마를 더했는지.
@@ -25,6 +26,8 @@ from dataclasses import dataclass, fields, MISSING, field as dc_field
 from gidc.core.profile import (
     SkillHit, source_label, build_damage_context, build_transformative_context,
 )
+# build_{lunar,stellar}_reaction_context는 여기서 import하지 않는다 —
+# explain_party_reaction이 빌더를 인자로 받으므로 어느 계열인지 고르는 쪽은 호출자다.
 from gidc.core.damage import DamageResult, calculate
 
 _EPS = 1e-9
@@ -37,11 +40,16 @@ _DMG_POOL_FIELDS = [
     "anemo_dmg_bonus", "geo_dmg_bonus", "dendro_dmg_bonus", "physical_dmg_bonus",
     "normal_atk_dmg_bonus", "charged_atk_dmg_bonus", "plunging_dmg_bonus",
     "skill_dmg_bonus", "burst_dmg_bonus", "all_dmg_bonus", "flat_dmg_bonus",
-    "lunar_reaction_base_dmg_bonus",
+    # 달·별 반응의 기초 피해 증가는 반응별로 나뉘어 있다 — 「달감전만」 올리는 버프(이네파
+    # Moonsign)가 달개화·달결정까지 올리면 안 되기 때문이다(profile.celestial_base_dmg_bonus_field).
+    "lunar_charged_base_dmg_bonus", "lunar_bloom_base_dmg_bonus",
+    "lunar_crystallize_base_dmg_bonus",
+    "stellar_conduct_base_dmg_bonus", "stellar_swirl_base_dmg_bonus",
     "vaporize_bonus", "melt_bonus", "overloaded_bonus", "superconduct_bonus",
     "electrocharged_bonus", "swirl_bonus", "shatter_bonus", "burning_bonus",
     "bloom_bonus", "hyperbloom_bonus", "burgeon_bonus", "aggravate_bonus",
     "spread_bonus", "lunar_charged_bonus", "lunar_bloom_bonus", "lunar_crystallize_bonus",
+    "stellar_conduct_bonus", "stellar_swirl_bonus",
 ]
 
 # 히트가 만들어질 때 박히는 값 — 버프가 아니라 서술자다(특성 계수 등). 원장에 안 잡히는
@@ -53,6 +61,8 @@ _DECLARED_FIELDS = ["coeff", "coeff_amp"]
 _CRIT_REACTION_FIELDS = [
     "crit_rate", "crit_dmg", "elemental_mastery", "energy_recharge",
     "def_reduction", "def_ignore", "elevation_multiplier",
+    # 별 반응 계수의 재료. 계수를 바꾸는 값이라 「이 숫자가 왜 그런지」에 답하려면 보여야 한다.
+    "stellar_recorded_hits", "stellar_gust_level",
     "pyro_res_reduction", "hydro_res_reduction", "cryo_res_reduction",
     "electro_res_reduction", "anemo_res_reduction", "geo_res_reduction",
     "dendro_res_reduction", "physical_res_reduction",
@@ -171,6 +181,42 @@ def explain_transformative(
 
     trace: list = []
     ctx = build_transformative_context(
+        carrier, enemy, reaction=reaction, element=element, char_level=char_level
+    )
+    result = calculate(ctx, trace)
+
+    name = f"{reaction.value} ({element.value} 피해)"
+    return HitExplanation(name, result, _field_breakdowns(carrier, parts), trace)
+
+
+def explain_party_reaction(
+    carrier: SkillHit,
+    *,
+    enemy,
+    reaction,
+    element,
+    build_context,
+    char_level: int = 90,
+) -> HitExplanation:
+    """달·별 반응 반응 피해에서 **참여자 한 명의 몫**을 설명한다(가중치를 곱하기 전 값).
+
+    explain_transformative와 같은 규약이다 — carrier는 스탯·버프 캐리어일 뿐 때리는 히트가
+    아니고, Layer 1(버프 출처)은 캐리어 원장에서 그대로 읽고 Layer 2(공식)만 이 경로로 돈다.
+
+    build_context가 계열을 가른다 — profile.build_lunar_reaction_context 또는
+    build_stellar_reaction_context. core.party_reaction.party_reaction_damage와 같은 규약이며,
+    같은 반응 행을 설명하려면 **그쪽과 같은 빌더를 넘겨야** 숫자가 맞는다.
+    기본값을 두지 않는 이유가 그것이다 — 빠뜨렸을 때 조용히 다른 계열로 설명하는 대신
+    TypeError로 즉시 실패해야 한다.
+
+    파티 가중합은 여기서 다루지 않는다 — 참여자 목록과 가중치는 core.party_reaction이 갖고
+    있고, 이 함수는 그중 한 명의 숫자가 왜 그런지에만 답한다.
+    어떤 필드가 실제로 들어가는지는 profile.{lunar,stellar}_reaction_input_fields가 답한다.
+    """
+    parts = _collect_parts(carrier)
+
+    trace: list = []
+    ctx = build_context(
         carrier, enemy, reaction=reaction, element=element, char_level=char_level
     )
     result = calculate(ctx, trace)

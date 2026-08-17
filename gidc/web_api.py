@@ -43,14 +43,19 @@ from gidc.core.damage import calculate
 from gidc.core.enemy import Enemy
 from gidc.core.explain import (
     _CRIT_REACTION_FIELDS, _DECLARED_FIELDS, _DEFAULTS, _DMG_POOL_FIELDS, _STAT_TRIPLES,
-    explain_hit, explain_transformative,
+    explain_hit, explain_party_reaction, explain_transformative,
 )
+from gidc.core.party_reaction import party_reaction_damage
 from gidc.core.party import Party
 from gidc.core.profile import (
-    build_damage_context, build_transformative_context, damage_input_fields,
-    set_recording, transformative_input_fields,
+    build_damage_context, build_lunar_reaction_context, build_stellar_reaction_context,
+    build_transformative_context, damage_input_fields, lunar_reaction_input_fields,
+    set_recording, stellar_reaction_input_fields, transformative_input_fields,
 )
-from gidc.core.reaction import aura_pool, hit_candidates, transformative_candidates
+from gidc.core.reaction import (
+    aura_pool, hit_candidates, lunar_candidates, stellar_candidates,
+    suppressed_transformatives, transformative_candidates,
+)
 from gidc.enums import (
     ArtifactSet, ArtifactSlot, CharacterTrait, Element, ReactionType, StatType,
 )
@@ -100,7 +105,7 @@ def get_registries() -> dict:
         "weaponLevels": _weapon_levels(),
         # 반응 목록은 여기서 내보내지 않는다 — 고를 수 있는 반응은 히트 원소와 파티 구성에
         # 따라 다르고, 전체 목록을 주면 불가능한 조합까지 고를 수 있다는 뜻이 된다.
-        # 히트별 후보는 run_calculation의 damage[].hits[].candidates로 온다.
+        # 히트별 후보는 run_calculation의 damage.chars[].hits[].candidates로 온다.
         "traits":       [{"id": t.name, "label": t.value} for t in CharacterTrait],
         "counts": {
             "characters":   len(CHARACTER_REGISTRY),
@@ -418,9 +423,10 @@ def run_calculation(sheet, answers=None) -> dict:
     set_recording(bool(settings.get("explain") or settings.get("explainReaction")))
 
     source = MappingSource(answers)
+    party  = Party(*members)
     try:
         with using(source):
-            all_hits = Party(*members).build_profiles()
+            all_hits = party.build_profiles()
     except (ValueError, AssertionError) as e:
         return _empty([{"index": -1, "character": "", "message": str(e)}])
 
@@ -430,11 +436,27 @@ def run_calculation(sheet, answers=None) -> dict:
     hit_reactions = settings.get("hitReactions") or {}
     targets       = set(settings.get("targets") or [])
 
+    # 달·별 반응 트리거 참여자는 유저 답변이라 build_profiles(Phase 4)가 이미 모아 뒀다.
+    # 피해 계산은 가중치가 순위로 정해져 최종 스탯 확정 뒤라야 하므로 여기서 한다.
+    # 치명타는 참여자마다 따로 굴러간다 — {반응: {캐릭터: bool}}. 질문(ask_*)이 아니라
+    # 화면 선택이라 hitReactions와 같이 settings로 온다.
+    # 계열별로 묶어 넘긴다 — 계열이 늘 때 함수 시그니처가 끝없이 길어지지 않게.
+    participants = {
+        "lunar":   party.lunar_participants,
+        "stellar": party.stellar_participants,
+    }
+    crits = {
+        "lunar":   settings.get("lunarCrits") or {},
+        "stellar": settings.get("stellarCrits") or {},
+    }
+
     return {
         "stats":   _stats(all_hits),
-        "damage":  _damage(all_hits, enemy, members, hit_reactions, targets),
+        "damage":  _damage(all_hits, enemy, members, hit_reactions, targets,
+                           participants, crits),
         "explain": _explain(all_hits, enemy, members, hit_reactions, targets,
-                            settings.get("explain"), settings.get("explainReaction")),
+                            settings.get("explain"), settings.get("explainReaction"),
+                            participants, crits),
         "questions": [q.to_dict() for q in source.asked],
         "pending":   [q.id for q in source.pending],
         "stale":     source.stale,
@@ -443,7 +465,7 @@ def run_calculation(sheet, answers=None) -> dict:
 
 
 def _empty(errors: list[dict]) -> dict:
-    return {"stats": [], "damage": [], "explain": None,
+    return {"stats": [], "damage": {"chars": [], "lunar": [], "stellar": []}, "explain": None,
             "questions": [], "pending": [], "stale": [], "errors": errors}
 
 
@@ -471,12 +493,42 @@ def _stats(all_hits) -> list[dict]:
 # 방어력 배율과 반응 레벨 배율은 **때리는 캐릭터 자신의 레벨**로 정해진다. 파티에
 # 레벨이 섞여 있으면(Lv.80 시틀라리 + Lv.90 딜러) 한 값으로 뭉뚱그릴 수 없고, Lv.80을
 # 90으로 계산하면 방어력 배율이 0.4865 대신 0.5가 되어 피해가 2.78% 부풀려진다.
-def _damage(all_hits, enemy, members, hit_reactions, targets) -> list[dict]:
-    """캐릭터마다 블록 하나. 히트(직접 피해)와 반응(격변 1회)을 나눠 담는다.
+# ── 파티 공용 반응 계열 ────────────────────────────────────────────────────────
+# 달반응과 별 반응은 「트리거할 수 있는 파티원 여럿의 가중합」이라는 점이 같고, 계열마다 다른
+# 것은 후보 유도·컨텍스트 빌더·적용 필드 세 개뿐이다. 그 셋을 여기 한 줄로 묶어 두면
+# _party_reaction_rows와 _explain_party가 계열을 모르는 코드로 남는다.
+#
+# 키는 화면이 쓰는 kind 값이고, damage 딕셔너리의 키이자 settings의 *Crits 키와도 맞춰 둔다
+# (run_calculation의 participants/crits). 계열이 늘면 여기 한 줄만 추가한다.
+_PARTY_REACTION_FAMILIES = {
+    "lunar": {
+        "title":        "달반응 (파티 공용)",
+        "candidates":   lunar_candidates,
+        "context":      build_lunar_reaction_context,
+        "input_fields": lunar_reaction_input_fields,
+    },
+    "stellar": {
+        "title":        "별 반응 (파티 공용)",
+        "candidates":   stellar_candidates,
+        "context":      build_stellar_reaction_context,
+        "input_fields": stellar_reaction_input_fields,
+    },
+}
 
-    둘은 열의 의미가 다르다 — 격변은 계수도 스탯도 %피해 보너스도 타지 않고, 반응 전용
-    치명타가 없으면 비크리와 크리가 같은 값이 된다. 그래서 한 표에 섞지 않는다.
+
+def _damage(all_hits, enemy, members, hit_reactions, targets,
+            participants, crits) -> dict:
+    """캐릭터마다 블록 하나(chars) + 파티 공용 달·별 반응 행(lunar / stellar).
+
+    히트(직접 피해)와 반응(격변 1회)은 열의 의미가 달라 한 표에 섞지 않는다 — 격변은 계수도
+    스탯도 %피해 보너스도 타지 않고, 반응 전용 치명타가 없으면 비크리와 크리가 같은 값이 된다.
+
+    달·별 반응 반응 피해는 아예 캐릭터 블록 밖이다. 트리거할 수 있는 파티원 여럿이 각자 피해를
+    넣고 그 **가중합**이 파티의 값이라, 누구 한 명의 블록에 넣으면 그 캐릭터가 낸 피해인 양
+    읽힌다(core.party_reaction).
     """
+    suppressed = suppressed_transformatives(members)
+
     out = []
     for char, hits in all_hits.items():
         if targets and char.name not in targets:
@@ -505,7 +557,7 @@ def _damage(all_hits, enemy, members, hit_reactions, targets) -> list[dict]:
         carrier = next(iter(hits.values()), None)
         reaction_rows = []
         if carrier is not None:
-            for reaction, element in transformative_candidates(char.element, aura):
+            for reaction, element in _transformative_candidates(char, aura, suppressed):
                 ctx = build_transformative_context(
                     carrier, enemy,
                     reaction=reaction, element=element, char_level=char.level,
@@ -521,7 +573,100 @@ def _damage(all_hits, enemy, members, hit_reactions, targets) -> list[dict]:
                 })
 
         out.append({"char": char.name, "hits": hit_rows, "reactions": reaction_rows})
-    return out
+
+    result = {"chars": out}
+    for kind in _PARTY_REACTION_FAMILIES:
+        result[kind] = _party_reaction_rows(
+            all_hits, enemy, members, kind,
+            participants.get(kind) or {}, crits.get(kind) or {},
+        )
+    return result
+
+
+def _transformative_candidates(char, aura, suppressed) -> tuple:
+    """이 캐릭터의 격변 후보에서 **달·별 반응으로 전환된 것**을 뺀다.
+
+    달감전 파티에서 감전 행과 달감전 행이 나란히 뜨면 둘 다 일어나는 것처럼 읽힌다.
+    _damage와 _explain_reaction이 같은 함수를 봐야 표와 설명이 어긋나지 않는다.
+
+    억제는 (반응, **피해 원소**) 쌍으로 온다 — 확산은 확산된 원소마다 한 행이라 반응
+    이름만으로 막으면 별 확산 하나가 불·물·번개 확산까지 지운다
+    (core.reaction.suppressed_transformatives).
+    """
+    return tuple(
+        (reaction, element)
+        for reaction, element in transformative_candidates(char.element, aura)
+        if (reaction, element) not in suppressed
+    )
+
+
+def _crit_chars(family_crits, reaction) -> set[str]:
+    """이 반응에서 치명타가 터진 참여자 이름. settings.lunarCrits[반응][캐릭터] = bool
+    (별 반응은 stellarCrits).
+
+    반응별로 나누는 이유: 달감전과 달결정은 서로 다른 피해 인스턴스라 같은 캐릭터의 판정도
+    따로 굴러간다. 캐릭터별로 나누는 이유: 파티 단위 스위치로 묶으면 「전원 크리」와
+    「전원 비크리」 두 조합만 표현된다 — 실제로 보고 싶은 것은 그 사이다.
+    """
+    picked = family_crits.get(reaction.name) or {}
+    return {name for name, on in picked.items() if on}
+
+
+def _party_reaction_rows(all_hits, enemy, members, kind,
+                         family_participants, family_crits) -> list[dict]:
+    """파티 공용 반응 피해 행(달반응 또는 별 반응). 참여자별 몫(shares)까지 함께 내보낸다.
+
+    두 숫자를 함께 낸다 — selected는 지금 고른 치명타 조합의 가중합이고, expected는 조합
+    2^N개를 확률로 접은 기댓값이라 선택과 무관하다. 참여자마다 판정이 따로 굴러가므로
+    「비크리/크리」 두 열로는 조합을 표현할 수 없다.
+
+    순위 배수는 조합마다 다시 매겨진다 — 크리로 대소가 역전되면 1등 배수도 옮겨간다
+    (core.party_reaction._rank_weights). 그래서 shares의 weight도 지금 선택에 따라 바뀐다.
+
+    targets(설명용 캐릭터 필터)로 걸러내지 않는다 — 파티 전체가 재료인 값이라 한 명으로
+    좁히면 남은 사람 몫이 사라져 다른 숫자가 된다.
+
+    계열을 kind 하나로만 안다 — 후보 유도와 컨텍스트 빌더는 _PARTY_REACTION_FAMILIES가
+    갖고 있다. 별 초전도가 여기 안 뜨는 것도 그 표의 candidates(stellar_candidates)가
+    반응 피해 없는 반응을 이미 걸러 내기 때문이다.
+    """
+    family = _PARTY_REACTION_FAMILIES[kind]
+    rows = []
+    for reaction, element, _candidates in family["candidates"](members):
+        dmg = party_reaction_damage(
+            all_hits, enemy,
+            reaction=reaction, element=element,
+            participants=family_participants.get(reaction, ()),
+            build_context=family["context"],
+            crit_chars=_crit_chars(family_crits, reaction),
+        )
+        if dmg is None:
+            continue    # 후보는 있으나 유저가 트리거를 아무도 고르지 않았다
+        rows.append({
+            "reaction": reaction.name,
+            "label":    reaction.value,
+            "element":  element.value,
+            "selected": dmg.selected,
+            "expected": dmg.total.expected,
+            # 선택의 양 끝 — 화면이 「지금 값이 어디쯤인가」를 말해 줄 수 있다.
+            "allNonCrit": dmg.total.non_crit,
+            "allCrit":    dmg.total.crit,
+            "shares": [_lunar_share(s) for s in dmg.shares],
+        })
+    return rows
+
+
+def _lunar_share(s) -> dict:
+    """참여자 한 명의 몫. 데미지 표(치명타 버튼)와 설명 창(가중치 표)이 같이 쓴다."""
+    return {
+        "char":     s.char,
+        "weight":   s.weight,
+        "critOn":   s.crit_on,
+        "nonCrit":  s.result.non_crit,
+        "crit":     s.result.crit,
+        "expected": s.result.expected,
+        "selected": s.selected,
+    }
 
 
 def _hit_candidates(hit, aura) -> tuple:
@@ -569,7 +714,7 @@ _FORMULA_ORDER = [
     ("coeff",                    "계수"),
     ("coeff_amp",                "계수 증폭"),
     ("lv_mult",                  "레벨 배율"),
-    ("1+lunar_base",             "달반응 기초 피해 증가"),
+    ("1+lunar_base",             "달·별 반응 기초 피해 증가"),
     ("additive_flat(촉진/발산)",  "촉진/발산 가산"),
     ("flat_dmg_bonus",           "고정 피해 추가"),
     ("base_dmg",                 "기초 피해"),
@@ -602,6 +747,18 @@ _FORMULA_ORDER_TRANSFORMATIVE = [
     # ── 결과 ──
     "non_crit", "crit", "expected",
 ]
+# 달·별 반응 반응 피해도 격변과 같은 이유로 순서를 따로 세운다 — 반응 배율·레벨 배율·기초
+# 피해 증가·원마 보너스가 배율이 아니라 **기초 피해를 만드는 재료**다(_calc_lunar_reaction).
+# 격변과 갈리는 자리는 「1+lunar_base」가 재료에 끼고, 고저차 배율이 뒤에 붙는다는 것뿐이다.
+# 별 반응도 같은 공식을 타므로(damage._DISPATCH) 이 순서를 그대로 공유한다.
+_FORMULA_ORDER_LUNAR = [
+    # ── 기초 피해 재료 ──
+    "reaction_mult", "lv_mult", "1+lunar_base", "em_bonus", "reaction_bonus", "base_dmg",
+    # ── 여기에 곱해지는 배율 ──
+    "crit_mult", "res_mult", "elevation",
+    # ── 결과 ──
+    "non_crit", "crit", "expected",
+]
 
 # (1+피해량증가) × 방어 × 내성을 한 번에 곱하려고 코드가 미리 뭉쳐 둔 중간값이다.
 # 게임 공식에 있는 항이 아니고, 곱해진 셋이 이미 따로 나오므로 화면에서는 뺀다.
@@ -610,17 +767,24 @@ _STAT_FIELDS = {f"{pre}_{tag}" for _, pre in _STAT_TRIPLES for tag in _STAT_PART
 
 
 def _explain(all_hits, enemy, members, hit_reactions, targets,
-             hit_name, reaction_spec) -> dict | None:
+             hit_name, reaction_spec, participants, crits) -> dict | None:
     """버프 귀속. Explain은 이미 구조화돼 있어 그대로 편다 (to_text()는 쓰지 않는다).
 
     화면 구성(스탯 조립 / 보너스 풀 / 치명타·반응 / 공식)까지 여기서 짜 준다.
     어떤 필드가 어느 묶음인지는 explain.py가 이미 알고 있고, JS가 그 목록을
     베껴 들고 있으면 필드가 늘 때마다 조용히 어긋난다.
 
-    설명 대상은 데미지 화면의 두 표에 하나씩 대응한다 — 히트 표는 hit_name(히트 이름),
+    설명 대상은 데미지 화면의 표에 하나씩 대응한다 — 히트 표는 hit_name(히트 이름),
     반응 표는 reaction_spec({char, reaction, element})이다. 반응 쪽이 원소까지 받는 이유는
-    확산이 피해 원소별로 네 행이라 반응 이름만으로는 행이 특정되지 않기 때문이다."""
+    확산이 피해 원소별로 네 행이라 반응 이름만으로는 행이 특정되지 않기 때문이다.
+    달·별 반응 행은 같은 reaction_spec에 kind="lunar"/"stellar"를 달아 온다 — 그쪽은 char가
+    「어느 참여자의 상세를 볼지」를 고르는 값이고, 비우면 가중치가 가장 큰 참여자를 보여준다."""
     if reaction_spec:
+        kind = reaction_spec.get("kind")
+        if kind in _PARTY_REACTION_FAMILIES:
+            return _explain_party(all_hits, enemy, members, kind,
+                                  participants.get(kind) or {},
+                                  crits.get(kind) or {}, reaction_spec)
         return _explain_reaction(all_hits, enemy, members, targets, reaction_spec)
     if not hit_name:
         return None
@@ -662,6 +826,7 @@ def _explain_reaction(all_hits, enemy, members, targets, spec) -> dict | None:
     if not (reaction_name and element_value):
         return None
 
+    suppressed = suppressed_transformatives(members)   # 파티 단위 판정이라 루프 밖에서 한 번
     for char, hits in all_hits.items():
         if targets and char.name not in targets:
             continue
@@ -675,7 +840,7 @@ def _explain_reaction(all_hits, enemy, members, targets, spec) -> dict | None:
         # _selected_reaction과 같은 이유다 — 파티를 바꿔 불가능해진 선택이 화면에 남아
         # 있으면 조용히 틀린 숫자를 진짜인 양 설명하게 된다.
         aura = aura_pool(members, char)
-        for reaction, element in transformative_candidates(char.element, aura):
+        for reaction, element in _transformative_candidates(char, aura, suppressed):
             if reaction.name != reaction_name or element.value != element_value:
                 continue
             ex = explain_transformative(
@@ -697,10 +862,85 @@ def _explain_reaction(all_hits, enemy, members, targets, spec) -> dict | None:
     return None
 
 
+def _explain_party(all_hits, enemy, members, kind,
+                   family_participants, family_crits, spec) -> dict | None:
+    """파티 공용 반응 피해의 설명 — 가중치 내역(shares) + 참여자 한 명의 상세.
+
+    가중합 자체는 여러 캐릭터의 값이라 공식 트레이스가 하나로 나오지 않는다. 그래서 창은
+    두 층으로 답한다: 위에는 누가 얼마의 가중치로 얼마를 넣었는지, 아래는 그중 한 명의 숫자가
+    왜 그런지(_explain_reaction과 같은 모양). spec["char"]가 아래층의 대상을 고른다.
+
+    _damage의 같은 계열 행과 **같은 재료로 같은 숫자**가 나와야 하므로 후보 유도도 참여자도
+    가중치도 컨텍스트 빌더도 그쪽과 같은 것을 쓴다(_PARTY_REACTION_FAMILIES가 한 출처다).
+    """
+    reaction_name = spec.get("reaction")
+    element_value = spec.get("element")
+    if not (reaction_name and element_value):
+        return None
+
+    family = _PARTY_REACTION_FAMILIES[kind]
+    for reaction, element, _candidates in family["candidates"](members):
+        if reaction.name != reaction_name or element.value != element_value:
+            continue
+        participants = family_participants.get(reaction, ())
+        dmg = party_reaction_damage(
+            all_hits, enemy,
+            reaction=reaction, element=element, participants=participants,
+            build_context=family["context"],
+            crit_chars=_crit_chars(family_crits, reaction),
+        )
+        if dmg is None:
+            return None
+
+        # 상세를 볼 참여자. 고른 사람이 참여자에서 빠졌으면(답변이 바뀜) 가중치 최상위로
+        # 되돌린다 — shares는 파티 순서라 첫 원소가 1등이 아니다.
+        want   = spec.get("char")
+        names  = [s.char for s in dmg.shares]
+        target = want if want in names else max(dmg.shares, key=lambda s: s.weight).char
+        char   = next(c for c in participants if c.name == target)
+        carrier = next(iter(all_hits[char].values()))
+
+        ex = explain_party_reaction(
+            carrier, enemy=enemy,
+            reaction=reaction, element=element,
+            build_context=family["context"], char_level=char.level,
+        )
+        applied = family["input_fields"](reaction, element)
+        return _explain_payload(
+            ex, applied,
+            char = char.name,
+            kind = kind,
+            # 피해 원소는 반응이 정한다 — 캐리어의 원소가 아니다.
+            element    = element.value,
+            skill_type = None,
+            carrier    = carrier.name,
+            reaction   = reaction.name,
+            shares     = [_lunar_share(s) for s in dmg.shares],
+            total      = {"selected": dmg.selected, "expected": dmg.total.expected,
+                          "allNonCrit": dmg.total.non_crit, "allCrit": dmg.total.crit},
+        )
+    return None
+
+
+# 격변과 달·별 반응은 공식의 항 역할이 뒤집혀 있어 순서를 따로 세운다(각 표의 주석 참고).
+# 달반응과 별 반응은 같은 공식을 타므로 같은 순서를 공유한다(damage._DISPATCH).
+_FORMULA_ORDERS = {
+    "reaction": _FORMULA_ORDER_TRANSFORMATIVE,
+    "lunar":    _FORMULA_ORDER_LUNAR,
+    "stellar":  _FORMULA_ORDER_LUNAR,
+}
+
+
 def _explain_payload(ex, applied, *, char, kind, element, skill_type,
-                     carrier=None) -> dict:
-    """히트 설명과 반응 설명이 같은 모양을 내도록 묶는다 — 화면 렌더러가 하나뿐이다."""
-    order = _FORMULA_ORDER_TRANSFORMATIVE if kind == "reaction" else None
+                     carrier=None, reaction=None, shares=None, total=None) -> dict:
+    """히트·격변·달반응 설명이 같은 모양을 내도록 묶는다 — 화면 렌더러가 하나뿐이다.
+
+    shares/total은 달반응에만 있다 — 파티 가중합이라 「이 행의 숫자」가 참여자 한 명의
+    result와 다르다. 나머지 경로는 None이고, 화면은 그때 가중치 표를 그리지 않는다.
+
+    reaction은 표시명(「달감전」)이 아니라 **엔진 식별자**(LUNAR_CHARGED)다. 화면이 이 창을
+    다시 열 때(달반응 참여자를 바꿀 때) 필요하고, 표시명에서 되짚으면 조용히 어긋난다.
+    """
     return {
         "char":      char,
         "kind":      kind,
@@ -708,11 +948,14 @@ def _explain_payload(ex, applied, *, char, kind, element, skill_type,
         "element":   element,
         "skillType": skill_type,
         "carrier":   carrier,
+        "reaction":  reaction,
         "result":  {"nonCrit": ex.result.non_crit, "crit": ex.result.crit,
                     "expected": ex.result.expected},
+        "shares":  shares,
+        "total":   total,
         "stats":   _explain_stats(ex, applied),
         "groups":  _explain_groups(ex, applied),
-        "formula": _explain_formula(ex.formula, order),
+        "formula": _explain_formula(ex.formula, _FORMULA_ORDERS.get(kind)),
     }
 
 

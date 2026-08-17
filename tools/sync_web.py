@@ -77,10 +77,12 @@ out   = run_calculation({
 })
 if out["errors"]:
     sys.exit("계산이 오류를 돌려줬습니다: " + json.dumps(out["errors"], ensure_ascii=False))
-# damage는 캐릭터 블록이고 히트는 그 안에 있다 — 블록 수만 세면 전원의 히트가 통째로
-# 비어도 통과한다.
-hits      = sum(len(b["hits"]) for b in out["damage"])
-reactions = sum(len(b["reactions"]) for b in out["damage"])
+# damage["chars"]는 캐릭터 블록이고 히트는 그 안에 있다 — 블록 수만 세면 전원의 히트가
+# 통째로 비어도 통과한다. damage["lunar"]·["stellar"]는 파티 공용 반응 행이라 블록 밖이다.
+hits      = sum(len(b["hits"]) for b in out["damage"]["chars"])
+reactions = sum(len(b["reactions"]) for b in out["damage"]["chars"])
+lunar     = len(out["damage"]["lunar"])
+stellar   = len(out["damage"]["stellar"])
 if not hits:
     sys.exit("히트가 하나도 안 나왔습니다 — 프로필 조립이 조용히 비었습니다.")
 
@@ -90,6 +92,8 @@ print(json.dumps({
     "chars":     len(out["stats"]),
     "hits":      hits,
     "reactions": reactions,
+    "lunar":     lunar,
+    "stellar":   stellar,
     "questions": len(out["questions"]),
     "pending":   len(out["pending"]),
 }, ensure_ascii=False))
