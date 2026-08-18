@@ -210,9 +210,9 @@ _STELLAR_RULES: dict[ReactionType, tuple[CharacterTrait, frozenset[Element], Ele
 #
 # 별 초전도는 반응 피해가 없는데도(반응 시 「극지의 별 영역」 생성) 초전도를 지운다. 위
 # _LUNAR_SUPPRESSES가 달개화를 뺀 이유(「대체하면 화면에서 정보가 그냥 사라진다」)와 정반대
-# 결론이지만, 이쪽은 실측으로 확인된 사실이므로 실측을 따른다. 산드로네·오데트가 들어와
-# 극지의 별 영역 직접 피해 히트를 선언하면 사라진 자리가 채워진다 — 그전까지는 초전도 행이
-# 없는 것이 맞는 상태다.
+# 결론이지만, 이쪽은 실측으로 확인된 사실이므로 실측을 따른다. 사라진 자리는 전환 캐릭터의
+# 히트가 채운다 — 산드로네가 냉각 광선·프리즘탄·부성 온도 광선을 별 초전도/별 확산 직접
+# 피해로 계열마다 한 벌씩 선언하고 있다(content.characters.cryo.sandrone).
 _STELLAR_SUPPRESSES: dict[ReactionType, tuple[ReactionType, Element]] = {
     ReactionType.STELLAR_CONDUCT: (ReactionType.SUPERCONDUCT, Element.CRYO),
     ReactionType.STELLAR_SWIRL:   (ReactionType.SWIRL,        Element.CRYO),

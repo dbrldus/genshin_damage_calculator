@@ -42,8 +42,8 @@ class CharacterTrait(Enum):
     # 있어야 한다(core.reaction.stellar_conditions). 두 별 반응의 보유자가 현재 같지만
     # (산드로네·오데트) 특성을 하나로 합치지 않는다 — 한쪽만 전환하는 캐릭터가 나오면
     # 합쳐 둔 특성은 쪼갤 수 없고, 달반응이 이미 반응별로 나눠 둔 선례가 있다.
-    STELLAR_CONDUCT_CONVERTER = "별 초전도 전환"   # 산드로네(미구현)·오데트(미구현)
-    STELLAR_SWIRL_CONVERTER   = "별 확산 전환"     # 산드로네(미구현)·오데트(미구현)
+    STELLAR_CONDUCT_CONVERTER = "별 초전도 전환"   # 산드로네·오데트(미구현)
+    STELLAR_SWIRL_CONVERTER   = "별 확산 전환"     # 산드로네·오데트(미구현)
 
 
 class MoonsignLevel(Enum):
