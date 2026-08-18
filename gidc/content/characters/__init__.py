@@ -18,6 +18,7 @@ CHARACTER_REGISTRY: dict[str, type[Character]] = {
     "산드로네":  cryo.Sandrone,
     "이네파":  electro.Ineffa,
     "설탕":    anemo.Sucrose,
+    "한운":    anemo.Xianyun,
     "실로닌":  geo.Xilonen,
     "나비아":  geo.Navia,
 }
