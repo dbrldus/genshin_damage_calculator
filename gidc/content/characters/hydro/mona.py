@@ -2,7 +2,7 @@ from gidc.core.character import Character, clamp_talent_index
 from gidc.core.profile import SkillHit, SkillType, ScalingStat
 from gidc.enums import CharacterTrait, Element
 from gidc.enums import StatType
-from gidc.core.party_state import has_hexerei_rite
+from gidc.core.party_state import hexerei_rite_for
 from gidc.enums import WeaponType
 from gidc.prompt import ask_bool, ask_choice, ask_int
 
@@ -235,8 +235,8 @@ class Mona(Character):
     def contribute_dependent_stats(self, all_hits: dict["Character", dict[str, SkillHit]]) -> None:
         c = self.constellation
 
-        # 파티 편성으로 결정되므로 묻지 않는다 (마도 캐릭터 2명 이상).
-        self._hexerei_rite = has_hexerei_rite(all_hits)
+        # 파티 편성으로 결정되므로 묻지 않는다 (모나 본인이 마도 + 파티 마도 2명 이상).
+        self._hexerei_rite = hexerei_rite_for(self, all_hits)
 
         # 성이 활성 여부 — Q·C1·C4·C6 마도 분기가 모두 이 조건에 걸려 있어 한 번만 묻는다.
         self._omen_active = ask_bool("[모나 Q] 「성이」 효과 활성 여부")

@@ -28,6 +28,21 @@ def has_hexerei_rite(members) -> bool:
     return count_trait(members, CharacterTrait.HEXEREI) >= _HEXEREI_RITE_MIN
 
 
+def hexerei_rite_for(char, members) -> bool:
+    """이 캐릭터가 「마도·비밀 의식」을 획득했는가 — 자기 킷의 마도 효과를 켜는 조건.
+
+    마도 효과는 캐릭터 자신의 마도 특성(「마녀의 전야제」 등)이 내놓는다. 마녀의 과제를
+    완료하지 않았으면 그 특성 자체가 없으므로, 파티에 마도가 몇 명이든 내놓을 효과가 없다
+    — 정원(2명)은 그다음 조건이다. 그래서 파티 상태만 묻는 has_hexerei_rite와 갈린다.
+
+    같은 특성이 두 곳을 정한다는 점이 요점이다: 해제되지 않은 캐릭터는 count_trait의
+    정원에도 들어가지 않고(has_hexerei_rite), 효과를 받지도 내놓지도 않는다(이 함수).
+    자기 킷의 마도 분기는 반드시 이쪽을 읽는다 — has_hexerei_rite만 보면 「나 말고 둘」인
+    파티에서 마도가 아닌 캐릭터의 마도 강화가 조용히 켜진다.
+    """
+    return CharacterTrait.HEXEREI in char.traits and has_hexerei_rite(members)
+
+
 def skill_level_bonus(members) -> int:
     """파티 전원이 받는 원소전투 스킬 레벨 상승분.
 

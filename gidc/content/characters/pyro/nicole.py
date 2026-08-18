@@ -1,7 +1,7 @@
 from gidc.core.character import Character, clamp_talent_index
 from gidc.core.profile import SkillHit, SkillType, ScalingStat
 from gidc.enums import CharacterTrait, Element
-from gidc.core.party_state import has_hexerei_rite
+from gidc.core.party_state import hexerei_rite_for
 from gidc.enums import WeaponType
 from gidc.prompt import ask_bool
 
@@ -207,8 +207,8 @@ class Nicole(Character):
         # 단계에서 공격력을 더해 줄 수 있어 지금 확정하면 파티원 순서가 결과를 바꾼다.
         source_hit = next(iter(all_hits[self].values()))
 
-        # Hexerei: 마도·비밀 의식(마도 캐릭터 2명 이상) — 비밀 환영 피해 + Nicole ATK 300%
-        if has_hexerei_rite(all_hits):
+        # Hexerei: 마도·비밀 의식(니콜 본인이 마도 + 2명 이상) — 비밀 환영 피해 + Nicole ATK 300%
+        if hexerei_rite_for(self, all_hits):
             all_hits[self]["비밀 환영 비전 피해"].add(
                 "flat_dmg_bonus", lambda: source_hit.current_atk() * 3.0,
                 self, note="마도·비밀 의식")
