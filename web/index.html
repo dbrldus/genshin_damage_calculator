@@ -151,6 +151,18 @@
   .art { border-top:1px solid var(--line); padding-top:.4rem; margin-top:.4rem; }
   .art .hdr { display:flex; gap:.4rem; align-items:center; font-size:.85rem; margin-bottom:.3rem; }
   .art .hdr .name { min-width:3.2rem; color:var(--dim); }
+  /* 고르기 버튼 — 드롭다운이 있던 자리다(성유물 세트·무기가 선택 창을 쓴다).
+     생김새를 <select>에 맞춰 두어야 옆의 드롭다운과 한 줄로 읽히고,
+     이름이 길어도 줄을 밀어내지 않고 잘린다. */
+  .pickbtn { text-align:left; padding:.2rem .4rem; border-radius:4px;
+             white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .art .hdr .pickbtn { flex:1; min-width:0; }        /* 세트 — 줄을 꽉 채운다 */
+  .row .pickbtn { min-width:10rem; max-width:16rem; } /* 무기 — 짧아도 자리를 지킨다 */
+  /* 주옵션 값 — 성급·강화 레벨로 정해지므로 입력칸이 아니라 표시다.
+     입력칸 자리(4.5rem)를 그대로 차지해 부옵션 줄과 오른쪽 끝이 맞는다. */
+  .art .hdr .mainval { width:4.5rem; text-align:right; font-variant-numeric:tabular-nums; }
+  /* 강화 레벨 앞의 「+」 — 게임 표기(+20)를 숫자 입력 옆에서 그대로 읽히게 한다 */
+  .art .hdr .lvp { color:var(--dim); margin-right:-.2rem; }
   .subs { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:.25rem; }
   .subs > div { display:flex; gap:.25rem; }
   .subs select { flex:1; min-width:0; }
@@ -241,11 +253,12 @@
   .chip:hover { border-color:var(--dim); }
   .chip.on { border-color:currentColor; background:#8883; font-weight:600; }
 
-  /* 캐릭터 선택 창 — [+ 캐릭터 추가]와 빌드 편집 창의 캐릭터 교체가 함께 쓴다.
+  /* 선택 창 — 캐릭터와 성유물 세트가 같은 격자를 나눠 쓴다. 둘 다 이름만으로는 한눈에
+     안 들어오고 목록이 길어서(캐릭터 17명, 세트 61개) 그림으로 고르는 쪽이 빠르다.
      한 장 한 장이 <button>이라 마우스와 키보드(Tab/Enter) 둘 다로 고를 수 있다. */
-  dialog#charpicker { width:min(760px, calc(100% - 2rem)); }
-  #charpickerbody { padding:.9rem; max-height:75vh; overflow:auto; }
-  #charpickersearch { width:100%; box-sizing:border-box; margin-bottom:.7rem; }
+  dialog#picker { width:min(760px, calc(100% - 2rem)); }
+  .pk-body { padding:.9rem; max-height:75vh; overflow:auto; }
+  .pk-search { width:100%; box-sizing:border-box; margin-bottom:.7rem; }
   .cp-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(92px,1fr)); gap:.6rem; }
   .cp-item { position:relative; display:block; aspect-ratio:1; padding:0; margin:0;
              border:none; border-radius:8px; overflow:hidden; cursor:pointer;
@@ -265,6 +278,10 @@
                      text-shadow:0 1px 2px #000a;
                      background:linear-gradient(to top, #000b, #0000);
                      white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  /* 「(없음)」 칸 — 끼운 것을 빼는 자리. 그림이 없으므로 배경 대신 점선 테두리로 둔다 */
+  .cp-item.none { background:none; box-shadow:none; border:1px dashed var(--line);
+                  display:grid; place-items:center; color:var(--dim); font-size:.8rem; }
+  .cp-item.none:hover { border-color:var(--dim); box-shadow:none; }
   .cp-empty { grid-column:1/-1; text-align:center; color:var(--dim); padding:2rem 0; }
 </style>
 </head>
@@ -342,14 +359,15 @@
   </div>
 </dialog>
 
-<dialog id="charpicker">
+<!-- 캐릭터 · 성유물 세트 · 무기가 이 창 하나를 나눠 쓴다 (app.js 의 openPicker). -->
+<dialog id="picker">
   <div class="dlg-hdr">
-    <span id="charpickertitle">캐릭터 선택</span>
-    <button id="charpickerclose">닫기</button>
+    <span id="pickertitle">선택</span>
+    <button id="pickerclose">닫기</button>
   </div>
-  <div id="charpickerbody">
-    <input id="charpickersearch" type="text" placeholder="이름 검색…" autocomplete="off">
-    <div id="charpickergrid" class="cp-grid"></div>
+  <div class="pk-body">
+    <input id="pickersearch" class="pk-search" type="text" placeholder="이름 검색…" autocomplete="off">
+    <div id="pickergrid" class="cp-grid"></div>
   </div>
 </dialog>
 
@@ -365,6 +383,6 @@
 <!-- ?v= 는 캐시 무효화용 app.js 내용 해시. 손으로 고치지 않는다 —
      python tools/sync_web.py 가 저장할 때마다 다시 계산해 넣는다.
      (python -m http.server 는 Cache-Control 을 안 붙여서 브라우저가 옛 파일을 계속 쓴다) -->
-<script src="app.js?v=6db42720"></script>
+<script src="app.js?v=b083c5ca"></script>
 </body>
 </html>

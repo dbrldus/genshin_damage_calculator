@@ -327,78 +327,153 @@ function iconOf(kind, name, slot) {
            alt: ICON_ALT + key + ".png" };
 }
 
-// ── 캐릭터 선택 창 ───────────────────────────────────────────────────────
-// [+ 캐릭터 추가]와 빌드 편집 창의 캐릭터 교체가 함께 쓴다. 드롭다운 대신 초상화
-// 격자로 고르게 하는 이유: 이름만으로는 어느 캐릭터인지 한눈에 안 들어오고,
-// 목록이 길어질수록(지금도 14명) 스크롤하며 글자를 읽는 쪽이 더 느리다.
-let charPickerCurrent = null;   // 지금 이 슬롯에 있는 캐릭터 — 격자에서 테두리로 표시
-let charPickerOnPick = null;    // (name) => void — 고른 뒤 부를 콜백
+// ── 선택 창 ──────────────────────────────────────────────────────────────
+// 캐릭터 · 성유물 세트 · 무기가 창 하나를 나눠 쓴다. 셋 다 사정이 같다 — 이름만으로는
+// 어느 것인지 한눈에 안 들어오고, 목록이 길어(캐릭터 17 · 세트 61 · 무기 18) 드롭다운을
+// 굴리며 글자를 읽는 쪽이 느리다. 그래서 그림 격자로 고르고 이름으로 걸러 낸다.
+//
+// 창마다 다른 것은 「무엇을 올리나(items)」와 「칸 하나를 어떻게 그리나(card)」뿐이라
+// 창을 셋으로 베끼지 않고 여기 한 벌만 둔다. card(item) 이 돌려주는 것:
+//   key    고른 뒤 콜백에 넘길 값      label   이름표 — 검색도 이 글자로 한다
+//   title  마우스를 올렸을 때의 설명    badge   오른쪽 위 표식 (원소 첫 글자 / 성급)
+//   rarity 배경 색을 정하는 성급        accent  테두리 강조색 (기본은 성급 색)
+//   icon   iconOf(...) 결과 — 없거나 못 받으면 이름표만 남는다
+let picker = null;   // { cards, current, onPick, none, empty } — 닫혀 있으면 null
 
-function openCharPicker(current, onPick) {
-  charPickerCurrent = current;
-  charPickerOnPick = onPick;
-  $("charpickersearch").value = "";
-  renderCharPicker("");
-  $("charpicker").showModal();
-  $("charpickersearch").focus();
+function openPicker({ title, items, card, current = null, onPick, none = null, empty }) {
+  picker = { cards: items.map(card), current, onPick, none, empty };
+  $("pickertitle").textContent = title;
+  $("pickersearch").value = "";
+  renderPicker("");
+  $("picker").showModal();
+  $("pickersearch").focus();
 }
 
-function closeCharPicker() {
-  charPickerOnPick = null;
-  $("charpicker").close();
+function closePicker() {
+  picker = null;
+  $("picker").close();
 }
 
-// 5성/4성만 있고 3성 이하는 없다 — 성급별 배경 색만 갈라 둔다(실제 게임의 금색/보라 카드 느낌).
-const RARITY_BG = {
-  5: ["#8a6a2f", "#4a3813"],
-  4: ["#6a4f8a", "#382a4a"],
-};
-
-function renderCharPicker(filter) {
-  const grid = $("charpickergrid");
+function renderPicker(filter) {
+  const grid = $("pickergrid");
   grid.innerHTML = "";
-  const q = filter.trim().toLowerCase();
-  const list = reg.characters.filter((c) => !q || c.name.toLowerCase().includes(q));
+  if (!picker) return;
+  const pick = (key) => { const fn = picker.onPick; closePicker(); if (fn) fn(key); };
 
+  // 「(없음)」은 검색과 상관없이 늘 맨 앞이다 — 찾다 말고 비우는 길이 항상 열려 있어야 한다.
+  if (picker.none) {
+    const btn = make("button", { type: "button", className: "cp-item none",
+                                 textContent: "(없음)", title: picker.none });
+    btn.onclick = () => pick(null);
+    grid.append(btn);
+  }
+
+  const q = filter.trim().toLowerCase();
+  const list = picker.cards.filter((c) => !q || c.label.toLowerCase().includes(q));
   if (!list.length) {
-    grid.append(make("div", { className: "cp-empty", textContent: "일치하는 캐릭터가 없습니다." }));
+    grid.append(make("div", { className: "cp-empty", textContent: picker.empty }));
     return;
   }
 
   for (const c of list) {
     const btn = make("button", {
       type: "button",
-      className: "cp-item" + (c.name === charPickerCurrent ? " cur" : ""),
-      title: c.name,
+      className: "cp-item" + (c.key === picker.current ? " cur" : ""),
+      title: c.title || c.label,
     });
-    btn.style.setProperty("--ec", ELEMENT_COLOR[c.element] || "#8a8a8a");
     const [bg1, bg2] = RARITY_BG[c.rarity] || RARITY_BG[4];
     btn.style.setProperty("--cp-bg1", bg1);
     btn.style.setProperty("--cp-bg2", bg2);
+    btn.style.setProperty("--ec", c.accent || RARITY_EDGE[c.rarity] || RARITY_EDGE[4]);
 
-    const src = iconOf("characters", c.name);
-    if (src) {
-      const img = make("img", { alt: "", loading: "lazy", decoding: "async" });
-      img.dataset.alt = src.alt;
-      // 카드 타일의 tile()과 같은 이유 — CDN이 죽어도 격자 칸의 크기·이름표는 남는다.
-      img.onerror = () => {
-        if (img.dataset.alt) { img.src = img.dataset.alt; img.dataset.alt = ""; return; }
-        img.remove();
-      };
-      img.src = src.url;
-      btn.append(img);
-    }
-    btn.append(
-      make("span", { className: "badge", textContent: c.element.slice(0, 1) }),
-      make("span", { className: "label", textContent: c.name }));
+    const img = pickerImage(c.icon);
+    if (img) btn.append(img);
+    btn.append(make("span", { className: "badge", textContent: c.badge }),
+               make("span", { className: "label", textContent: c.label }));
 
-    btn.onclick = () => {
-      const fn = charPickerOnPick;
-      closeCharPicker();
-      if (fn) fn(c.name);
-    };
+    btn.onclick = () => pick(c.key);
     grid.append(btn);
   }
+}
+
+// 격자 칸의 그림. 카드 타일 tile()과 같은 이유로 실패해도 칸이 사라지지 않는다 —
+// CDN이 죽으면 그림만 빠지고 칸의 크기·이름표·성급 색은 남는다.
+function pickerImage(src) {
+  if (!src) return null;
+  const img = make("img", { alt: "", loading: "lazy", decoding: "async" });
+  img.dataset.alt = src.alt;
+  img.onerror = () => {
+    if (img.dataset.alt) { img.src = img.dataset.alt; img.dataset.alt = ""; return; }
+    img.remove();
+  };
+  img.src = src.url;
+  return img;
+}
+
+// 성급별 색(실제 게임의 금색/보라/파랑 카드 느낌). 캐릭터는 5·4성뿐이지만 성유물 세트와
+// 무기는 그 아래로도 내려간다 — 세트는 최고 성급으로 칠한다.
+const RARITY_BG = {
+  5: ["#8a6a2f", "#4a3813"],
+  4: ["#6a4f8a", "#382a4a"],
+  3: ["#3f5f8a", "#22334a"],
+  2: ["#3f7a5a", "#1e3a2c"],
+  1: ["#5a5f66", "#2e3236"],
+};
+const RARITY_EDGE = { 5: "#d9ab3f", 4: "#9a6fd0", 3: "#5f9fd0", 2: "#4fae86", 1: "#9aa0a6" };
+
+// 캐릭터 — [+ 캐릭터 추가]와 빌드 편집 창의 캐릭터 교체가 함께 쓴다. 「(없음)」이 없는
+// 것은 파티 슬롯이 비어 있을 수 없어서다(슬롯을 없애는 것은 카드의 [삭제]가 한다).
+function openCharPicker(current, onPick) {
+  openPicker({
+    title:   "캐릭터 선택",
+    items:   reg.characters,
+    empty:   "일치하는 캐릭터가 없습니다.",
+    current, onPick,
+    card: (c) => ({
+      key: c.name, label: c.name, rarity: c.rarity,
+      badge:  c.element.slice(0, 1),
+      accent: ELEMENT_COLOR[c.element] || "#8a8a8a",
+      icon:   iconOf("characters", c.name),
+    }),
+  });
+}
+
+// 성유물 세트 — **부위마다** 열린다. 그 부위의 그림을 보여주고 그 부위가 있는 세트만
+// 올린다(기도 4종은 관뿐이라 꽃 창에는 아예 나오지 않는다).
+function openSetPicker(slot, current, onPick) {
+  openPicker({
+    title:   `성유물 세트 선택 — ${slot.label}`,
+    items:   reg.artifactSets.filter((s) => s.slots.includes(slot.key)),
+    none:    `${slot.label} 부위를 비웁니다`,
+    empty:   "일치하는 세트가 없습니다.",
+    current, onPick,
+    card: (s) => {
+      const top = Math.max(...s.rarities);
+      return {
+        key: s.id, label: s.label, rarity: top, badge: String(top),
+        title: `${s.label} · ${Math.min(...s.rarities)}~${top}성`,
+        icon:  iconOf("artifacts", s.label, slot.label),
+      };
+    },
+  });
+}
+
+// 무기 — 캐릭터가 장착할 수 있는 종류만 올린다. 기초 공격력은 툴팁에 적는다. 칸에 적으면
+// 이름표가 두 줄이 되는 데다, 그 값은 **고를 때 알아보라고** 보여주는 만렙 기준 반올림이지
+// 계산에 쓰이는 값이 아니다(계산에는 레벨·돌파로 정해지는 소수가 들어간다).
+function openWeaponPicker(weaponType, current, onPick) {
+  openPicker({
+    title:   "무기 선택",
+    items:   reg.weapons.filter((w) => !weaponType || w.type === weaponType),
+    none:    "무기를 뺍니다",
+    empty:   "일치하는 무기가 없습니다.",
+    current, onPick,
+    card: (w) => ({
+      key: w.name, label: w.name, rarity: w.rarity, badge: String(w.rarity),
+      title: `${w.name} · ${w.rarity}성 · 기초 공격력 ${w.baseAtk}`,
+      icon:  iconOf("weapons", w.name),
+    }),
+  });
 }
 
 function buildCard(c, i) {
@@ -737,27 +812,27 @@ function buildEditor(c) {
     d.append(trow);
   }
 
-  // 무기 — 캐릭터가 장착 가능한 종류만 보여준다
-  const usable = reg.weapons.filter((w) => !meta.weaponType || w.type === meta.weaponType);
+  // 무기 — 캐릭터·성유물 세트와 같은 선택 창에서 고른다. 장착 가능한 종류만 올라간다.
   const wrow = make("div", { className: "row" });
-  const wsel = make("select");
-  wsel.add(new Option("(없음)", ""));
-  for (const w of usable) wsel.add(new Option(`${w.name} (기초 ${w.baseAtk})`, w.name));
-  wsel.value = c.weapon ? c.weapon.name : "";
-  wsel.onchange = () => {
-    c.weapon = wsel.value
-      ? weaponLevelFor({ name: wsel.value, refinement: c.weapon?.refinement || 1,
+  const wbtn = make("button", {
+    type: "button", className: "pickbtn",
+    textContent: c.weapon ? c.weapon.name : "(없음)",
+    title: c.weapon ? `${c.weapon.name} — 다른 무기로 바꿉니다` : "무기를 고릅니다",
+  });
+  wbtn.onclick = () => openWeaponPicker(meta.weaponType, c.weapon ? c.weapon.name : null, (name) => {
+    c.weapon = name
+      ? weaponLevelFor({ name, refinement: c.weapon?.refinement || 1,
                          // 무기를 바꾸면 성급이 바뀌어 레벨 상한도 달라진다. 들고 있던
                          // 레벨을 그대로 물려주되 새 상한에 맞춰 자른다.
                          level: c.weapon?.level, ascension: c.weapon?.ascension })
       : null;
     structuralChange(true);   // 레벨/돌파/재련 입력의 활성 여부와 선택지가 바뀐다
-  };
+  });
   const rsel = opt([1, 2, 3, 4, 5], c.weapon ? c.weapon.refinement : 1,
                    (x) => x, (x) => "재련 " + x);
   rsel.disabled = !c.weapon;
   rsel.onchange = () => { if (c.weapon) { c.weapon.refinement = Number(rsel.value); structuralChange(); } };
-  wrow.append(make("label", { textContent: "무기" }, wsel), rsel);
+  wrow.append(make("label", { textContent: "무기" }, wbtn), rsel);
   d.append(wrow);
 
   // 무기 레벨 / 돌파 — 캐릭터 레벨과 같은 규칙이고, 상한만 성급으로 갈린다
@@ -803,41 +878,86 @@ function artifactEditor(c, slot) {
   const hdr = make("div", { className: "hdr" });
   hdr.append(make("span", { className: "name", textContent: slot.label }));
 
-  const setSel = make("select");
-  setSel.add(new Option("(없음)", ""));
-  for (const s of reg.artifactSets) setSel.add(new Option(s.label, s.id));
-  setSel.value = a ? a.set : "";
-  setSel.style.flex = "1";
-  setSel.onchange = () => {
-    if (!setSel.value) { c.artifacts[slot.key] = null; }
-    else if (a) { a.set = setSel.value; }
-    else { c.artifacts[slot.key] = blankArtifact(slot, setSel.value); }
-    structuralChange(!a || !setSel.value);   // 착탈이면 주옵·부옵 위젯이 생기거나 사라진다
-  };
-  hdr.append(setSel);
+  // 세트는 드롭다운이 아니라 선택 창에서 고른다 — 캐릭터와 같은 이유다(61개 중에서
+  // 이름을 읽어 내려가는 것보다 그림이 빠르고, 부위별 그림이 곧 이름표다).
+  const setBtn = make("button", {
+    type: "button", className: "pickbtn",
+    textContent: (a && setLabel(a.set)) || "(없음)",
+    title: `${slot.label} 부위의 세트를 고릅니다`,
+  });
+  setBtn.onclick = () => openSetPicker(slot, a ? a.set : null, (id) => {
+    if (!id) { c.artifacts[slot.key] = null; }
+    // 세트마다 있는 성급이 다르다(4~5성 세트에서 1~3성 세트로 갈아 끼우면 5성이 사라진다).
+    // 성급·강화 레벨을 새 세트에 맞춰 접어 준다 — 그래서 세트만 바꿔도 다시 그린다.
+    else if (a) { a.set = id; fitArtifactLevel(a); }
+    else { c.artifacts[slot.key] = blankArtifact(slot, id); }
+    structuralChange(true);
+  });
+  hdr.append(setBtn);
   box.append(hdr);
 
   if (!a) return box;
 
-  // 주옵션 — 이 부위에 허용된 것만
+  // 성유물 하나는 두 줄이다. 첫 줄이 **무엇을 끼웠나**(부위·세트·성급), 둘째 줄이
+  // **주옵션이 얼마인가**(스탯·강화 레벨·값)다. 성급이 세트 옆에 붙는 것은 세트가
+  // 성급을 정하기 때문이고(모험가는 1~3성뿐), 강화 레벨이 주옵션 옆에 붙는 것은
+  // 값이 그 자리에서 정해지기 때문이다 — 입력과 결과가 나란히 있어야 읽힌다.
+  const rsel = opt(artifactRarities(a.set), a.rarity, (x) => x, (x) => `${x}성`);
+  rsel.onchange = () => {
+    a.rarity = Number(rsel.value);
+    fitArtifactLevel(a);
+    structuralChange(true);                  // 강화 레벨의 상한이 달라진다
+  };
+  hdr.append(rsel);
+
+  // 주옵션 — 이 부위에 허용된 것만. 값은 성급·강화 레벨로 정해지므로 고르는 것이 아니라
+  // 보여주기만 한다(엔진이 넘겨준 표에서 읽는다 — 화면이 규칙을 베껴 쓰지 않는다).
   const mrow = make("div", { className: "hdr" });
   const allowed = reg.validMainStats[slot.key] || [];
   const msel = opt(allowed, a.main.stat, (x) => x, (x) => statLabel(x));
   msel.style.flex = "1";
-  msel.onchange = () => { a.main.stat = msel.value; structuralChange(); };
-  const mval = make("input", { type: "number", step: "0.1", value: a.main.value });
-  mval.style.width = "5rem";
-  mval.onchange = () => { a.main.value = Number(mval.value); structuralChange(); };
-  mrow.append(make("span", { className: "name", textContent: "주옵" }), msel, mval);
+  const mval = make("span", { className: "mainval" });
+  const showMain = () => { mval.textContent = artifactMainText(a); };
+  showMain();
+  msel.onchange = () => { a.main.stat = msel.value; showMain(); structuralChange(); };
+
+  // 강화 레벨은 캐릭터·무기 레벨과 같이 숫자로 친다. 상한이 성급마다 다르므로(5성 +20,
+  // 4성 +16) 상한을 옆에 적어 두고, 넘겨 친 값은 fitArtifactLevel이 잘라 되돌린다.
+  const lv = make("input", { type: "number", value: a.level, title: "강화 레벨" });
+  lv.style.width = "3.2rem";
+  lv.onchange = () => {
+    a.level = Number(lv.value);
+    fitArtifactLevel(a);
+    lv.value = a.level;                      // 잘린 값은 화면에도 되돌려 준다
+    showMain();
+    structuralChange();
+  };
+  mrow.append(make("span", { className: "name", textContent: "주옵" }), msel,
+              make("span", { className: "lvp", textContent: "+" }),
+              numField(lv, artifactMaxLevel(a.rarity), { min: 0 }), mval);
   box.append(mrow);
 
-  // 부옵션 4개 — 원소피해/치유는 목록에서 빠져 있다
+  // 부옵션 — 원소피해/치유는 목록에서 빠져 있다. 네 줄은 상한일 뿐이고(강화가 덜 된
+  // 성유물은 세 줄 이하다) (없음)으로 비운 줄은 spec 에 담지 않는다. 그래서 화면의
+  // 줄 자리와 a.subs 의 인덱스가 어긋난다 — 화면 쪽 rows 를 따로 들고, 거기서 빈 줄을
+  // 걸러 낸 것을 a.subs 에 넣는다. 줄을 비워도 다시 그리지 않으므로(잠금만 바꾼다)
+  // 편집하는 동안 남은 줄이 위로 밀려 올라오지 않는다.
   const subs = make("div", { className: "subs" });
-  a.subs.forEach((s, i) => {
-    const ssel = opt(reg.validSubStats, s.stat, (x) => x, (x) => statLabel(x));
-    ssel.onchange = () => { s.stat = ssel.value; structuralChange(); };
-    const sval = make("input", { type: "number", step: "0.1", value: s.value });
-    sval.onchange = () => { s.value = Number(sval.value); structuralChange(); };
+  const rows = Array.from({ length: reg.maxSubStats }, (_, i) => a.subs[i] || null);
+  const commit = () => { a.subs = rows.filter(Boolean); structuralChange(); };
+  rows.forEach((s, i) => {
+    const ssel = opt(["", ...reg.validSubStats], s ? s.stat : "",
+                     (x) => x, (x) => (x ? statLabel(x) : "(없음)"));
+    const sval = make("input", { type: "number", step: "0.1", value: s ? s.value : "" });
+    sval.disabled = !s;
+    ssel.onchange = () => {
+      rows[i] = ssel.value ? { stat: ssel.value, value: Number(sval.value) || 0 } : null;
+      sval.disabled = !ssel.value;
+      if (!ssel.value) sval.value = "";
+      else if (sval.value === "") sval.value = 0;
+      commit();
+    };
+    sval.onchange = () => { if (rows[i]) rows[i].value = Number(sval.value); commit(); };
     subs.append(make("div", {}, ssel, sval));
   });
   box.append(subs);
@@ -850,14 +970,54 @@ function artifactEditor(c, slot) {
 function blankArtifact(slot, set) {
   const main = (reg.validMainStats[slot.key] || ["HP"])[0];
   const pool = reg.validSubStats;
-  return {
+  const a = {
     set,
-    main: { stat: main, value: 0 },
+    rarity: artifactRarities(set)[0],   // 그 세트의 최고 성급에서 시작한다
+    main: { stat: main },        // 값은 성급·강화 레벨로 정해진다 — spec 이 들고 있지 않다
     subs: [0, 1, 2, 3].map((i) => ({ stat: pool[i % pool.length], value: 0 })),
   };
+  return fitArtifactLevel(a);
 }
 
-const statLabel = (id) => (reg.statTypes.find((s) => s.id === id) || {}).label || id;
+// 성유물의 (성급, 강화 레벨)을 그 세트에서 유효한 값으로 맞춘다. 세트를 갈아 끼웠을 때도,
+// 성급을 바꿨을 때도 같은 함수를 지난다 — 규칙이 한 곳에만 있게(무기 weaponLevelFor와 같다).
+function fitArtifactLevel(a) {
+  const allowed = artifactRarities(a.set);
+  // 없는 성급이면 가장 가까운 쪽으로 접는다 — 5성 세트에서 1~3성 세트로 갈아 끼우면 3성.
+  if (!allowed.includes(a.rarity)) {
+    a.rarity = allowed.reduce((best, r) =>
+      Math.abs(r - a.rarity) < Math.abs(best - a.rarity) ? r : best);
+  }
+  // 레벨이 아직 없으면(성유물을 막 끼웠을 때) 만강화에서 시작하고, 있으면 0~상한으로
+  // 자른다. 빈 칸을 만강화로 되돌리지 않는 것이 중요하다 — 지우고 다시 치는 중에 값이
+  // +20으로 튀면 무엇을 입력했는지 알 수 없다(무기 레벨 weaponLevelFor와 같은 규칙).
+  const top = artifactMaxLevel(a.rarity);
+  const raw = Number(a.level);
+  a.level = a.level == null || Number.isNaN(raw)
+    ? top
+    : Math.min(Math.max(Math.round(raw), 0), top);
+  return a;
+}
+
+// 성유물 주옵션 표 — 엔진이 (성급 → 스탯 → 강화 레벨) 값을 통째로 넘겨준다.
+// 배열 길이가 곧 그 성급의 강화 상한 + 1이고, 스탯이 달라도 길이는 같다.
+// 고를 수 있는 성급은 세트마다 다르므로 표가 아니라 세트 목록에서 읽는다.
+const artifactRarities = (set) =>
+  [...((reg.artifactSets.find((s) => s.id === set) || {}).rarities || [])]
+    .sort((a, b) => b - a);
+const artifactMaxLevel = (rarity) =>
+  Object.values(reg.artifactMainStat[rarity])[0].length - 1;
+
+function artifactMainText(a) {
+  const values = (reg.artifactMainStat[a.rarity] || {})[a.main.stat];
+  return values ? statValueText(a.main.stat, values[a.level]) : "—";
+}
+
+const statMeta  = (id) => reg.statTypes.find((s) => s.id === id) || {};
+const statLabel = (id) => statMeta(id).label || id;
+// 게임 화면의 표기 — %스탯은 소수 1자리, 실수치는 정수 (엔진 GearStat.__str__와 같은 규칙).
+const statValueText = (id, v) => v == null ? "—"
+  : statMeta(id).percent ? v.toFixed(1) + "%" : Math.round(v).toLocaleString("ko-KR");
 
 // ── 저장된 빌드 (localStorage) ───────────────────────────────────────────
 // 저장하는 값은 [내보내기]가 뱉는 JSON 그대로에 이름표만 붙인 것이다. 저장·불러오기가
@@ -1577,9 +1737,9 @@ $("sharecopy").onclick = async () => {
 $("explainclose").onclick = () => $("explain").close();
 $("editorclose").onclick = () => closeEditor();
 $("editor").addEventListener("close", () => { editing = null; });   // Esc로 닫힌 경우
-$("charpickerclose").onclick = () => closeCharPicker();
-$("charpicker").addEventListener("close", () => { charPickerOnPick = null; });   // Esc로 닫힌 경우
-$("charpickersearch").oninput = (e) => renderCharPicker(e.target.value);
+$("pickerclose").onclick = () => closePicker();
+$("picker").addEventListener("close", () => { picker = null; });    // Esc로 닫힌 경우
+$("pickersearch").oninput = (e) => renderPicker(e.target.value);
 $("reset").onclick = () => { answers = {}; recalc(); };
 $("enemylv").onchange = (e) => { enemyLevel = Number(e.target.value); recalc(); };
 wireTabs();
