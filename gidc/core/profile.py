@@ -133,6 +133,13 @@ class SkillHit:
     hp_flat:  float = 0.0
     atk_flat: float = 0.0
     def_flat: float = 0.0
+    # 「공격력에서 파생된 공격력」 지분 (자기 참조 차단용 꼬리표).
+    # 최종 공격력에는 그대로 들어가지만(current_atk), 공격력을 읽어 **다시 공격력을 만드는**
+    # 버프의 재료에서는 빠진다(convertible_atk). 얀사 운동량 측정기가 자기 자신을 필드 위
+    # 캐릭터로 삼는 경우가 이쪽이다 — 같은 슬롯을 읽고 쓰면 값이 정해지지 않기 때문이다.
+    # em_from_pct_share와 같은 계열이되, 뺄셈이 아니라 **별도 필드**여야 한다: 재료 쪽이
+    # atk_flat을 읽는 순간 자기 몫의 미결 지연 기여가 확정을 요구해 다시 순환이 된다.
+    atk_flat_derived: float = 0.0
     #endregion
 
     # ── 전투 스탯 ────────────────────────────────────────────────────────────
@@ -304,13 +311,31 @@ class SkillHit:
     # 지연 기여는 그보다 앞선 Phase 5.5에 계산되기 때문이다. *_final은 히트 자신이
     # 피해를 계산할 때 쓰는 값이고, 이쪽은 '지금까지 누적된 스탯'을 즉석에서 구한다.
     def current_hp(self)  -> float: return self.hp_base  * (1.0 + self.hp_pct)  + self.hp_flat
-    def current_atk(self) -> float: return self.atk_base * (1.0 + self.atk_pct) + self.atk_flat
+    def current_atk(self) -> float: return self.atk_base * (1.0 + self.atk_pct) + self.atk_flat + self.atk_flat_derived
     def current_def(self) -> float: return self.def_base * (1.0 + self.def_pct) + self.def_flat
 
     def convertible_em(self) -> float:
         # %-변환 버프(EM→피해 / EM→EM)가 읽어야 하는 EM. 꼬리표 달린 지분은 제외한다.
         # (예: 설탕이 준 EM은 카즈하의 EM→원소피해 변환 계산에 들어가지 않는다.)
         return self.elemental_mastery - self.em_from_pct_share
+
+    def convertible_atk(self) -> float:
+        """**공격력 → 공격력** 변환 버프만 읽는 공격력. 파생 지분(atk_flat_derived)은 뺀다.
+
+        게임의 스탯은 수정자를 순서대로 접은 결과라 i번째 수정자가 i-1까지의 값만 보고,
+        자기 출력이 자기 입력에 섞이지 않는다. 이 엔진은 순서 대신 지연 평가로 값을 정하므로
+        (party.py 첫머리) 같은 슬롯을 읽고 쓰면 해가 없는 순환이 된다 — 그 자리를 이 접근자가
+        대신한다. 얀사 운동량 측정기(자기 공격력 27% → 필드 위 캐릭터의 공격력)가 유일한 소비처다.
+
+        공격력을 읽어 **다른** 필드에 쓰는 버프(마비카·한운·제사의 여운 등)는 순환이 아니므로
+        current_atk()를 그대로 읽는다 — 실제로 들고 있는 공격력은 출처와 무관하게 전부 재료다.
+        convertible_em()이 %-재변환만 막고 EM→피해는 막지 않는 것과 같은 규약이다.
+
+        변환기가 둘 이상이면 서로의 파생 지분을 못 본다. 게임은 순서대로라면 뒤쪽이 앞쪽을
+        볼 테니 근사이지만, 순서 독립성을 지키려면 이쪽이 맞다(em_from_pct_share와 같은 교환).
+        현재 이 계열은 얀사 하나뿐이라 실제로 갈라지는 조합이 없다.
+        """
+        return self.atk_base * (1.0 + self.atk_pct) + self.atk_flat
 
     # ── 가산 기여 (출처 기록) ────────────────────────────────────────────────
     def add(

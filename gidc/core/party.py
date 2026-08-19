@@ -114,7 +114,7 @@ class Party:
 # 방식 B=Flat DMG 변환). 반면 EM은 꼬리표(em_from_pct_share) 달린 Flat으로 출력될 수 있으므로
 # (설탕·나히다) 감시 대상에서 제외한다.
 _CORE_POOL_FIELDS = (
-    "hp_flat", "hp_pct", "atk_flat", "atk_pct", "def_flat", "def_pct",
+    "hp_flat", "hp_pct", "atk_flat", "atk_flat_derived", "atk_pct", "def_flat", "def_pct",
 )
 
 

@@ -35,6 +35,13 @@ _EPS = 1e-9
 # ── 렌더링 섹션 구성 ─────────────────────────────────────────────────────────
 _STAT_TRIPLES = [("공격력", "atk"), ("HP", "hp"), ("방어력", "def")]
 
+# 코어 스탯에 더해지지만 이름이 「{접두}_flat」이 아닌 슬롯.
+# 최종 스탯 조립식(profile.SkillHit.current_atk 등)에 들어가므로 여기서도 같이 더해야
+# 화면의 「공격력 = base × (1+pct) + flat」 줄이 atk_final과 어긋나지 않는다.
+# atk_flat_derived는 「공격력에서 파생된 공격력」 꼬리표다 — 최종 공격력에는 들어가되
+# 공격력→공격력 변환의 재료에서만 빠진다(profile.convertible_atk 참고).
+_EXTRA_FLAT_FIELDS: dict[str, tuple[str, ...]] = {"atk": ("atk_flat_derived",)}
+
 _DMG_POOL_FIELDS = [
     "pyro_dmg_bonus", "hydro_dmg_bonus", "cryo_dmg_bonus", "electro_dmg_bonus",
     "anemo_dmg_bonus", "geo_dmg_bonus", "dendro_dmg_bonus", "physical_dmg_bonus",
@@ -256,6 +263,9 @@ def _render(exp: HitExplanation, *, hide_zero: bool) -> str:
         base = base_fb.total if base_fb else _DEFAULTS[f"{pre}_base"]
         pct  = pct_fb.total  if pct_fb  else _DEFAULTS[f"{pre}_pct"]
         flat = flat_fb.total if flat_fb else _DEFAULTS[f"{pre}_flat"]
+        # 이름이 「{접두}_flat」이 아닌 고정 슬롯도 최종 스탯에 들어간다 (_EXTRA_FLAT_FIELDS).
+        extras = [(n, exp.fields.get(n)) for n in _EXTRA_FLAT_FIELDS.get(pre, ())]
+        flat += sum((fb.total if fb else _DEFAULTS[n]) for n, fb in extras)
         final = base * (1.0 + pct) + flat
         if abs(final) <= _EPS and hide_zero:
             continue
@@ -263,6 +273,10 @@ def _render(exp: HitExplanation, *, hide_zero: bool) -> str:
         for tag, fb in (("base", base_fb), ("pct", pct_fb), ("flat", flat_fb)):
             if fb and (fb.parts or abs(fb.remainder) > 1e-6):
                 L.append(f"    {pre}_{tag} {fb.total:,.4f}")
+                L.extend(_render_parts(fb, "      "))
+        for name, fb in extras:
+            if fb and (fb.parts or abs(fb.remainder) > 1e-6):
+                L.append(f"    {name} {fb.total:,.4f}")
                 L.extend(_render_parts(fb, "      "))
 
     # ■ 피해 보너스 풀
