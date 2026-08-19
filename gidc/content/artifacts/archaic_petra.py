@@ -9,6 +9,8 @@ class ArchaicPetra(Artifact):
     지속 시간: 10초. 이러한 효과로 1가지의 원소 피해 보너스만 획득할 수 있다
     """
 
+    RARITIES = (4, 5)
+
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
             hit.add("geo_dmg_bonus", 0.15, (self.artifact_set, 2))

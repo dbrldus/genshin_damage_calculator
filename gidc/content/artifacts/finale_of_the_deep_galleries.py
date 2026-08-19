@@ -8,6 +8,8 @@ class FinaleOfTheDeepGalleries(Artifact):
     4세트: 원소 에너지 0pt 시 일반 공격 또는 원소 폭발 피해 +60%
     """
 
+    RARITIES = (4, 5)
+
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
             hit.add("cryo_dmg_bonus", 0.15, (self.artifact_set, 2))

@@ -8,6 +8,8 @@ class Instructor(Artifact):
     4세트: 원소 반응 후 파티 내 모든 캐릭터의 원소 마스터리가 120pt 증가한다. 지속 시간: 8초
     """
 
+    RARITIES = (3, 4)
+
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
             hit.add("elemental_mastery", 80, (self.artifact_set, 2))

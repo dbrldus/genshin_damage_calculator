@@ -8,6 +8,8 @@ class FragmentOfHarmonicWhimsy(Artifact):
     4세트: 생명의 계약의 수치가 증가 또는 감소 시, 캐릭터가 주는 피해가 18% 증가한다. 지속 시간: 6초, 최대 중첩수: 3회
     """
 
+    RARITIES = (4, 5)
+
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
             hit.add("atk_pct", 0.18, (self.artifact_set, 2))

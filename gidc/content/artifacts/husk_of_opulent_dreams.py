@@ -11,6 +11,8 @@ class HuskOfOpulentDreams(Artifact):
     스택 당 6%의 방어력과 6%의 바위 원소 피해 보너스를 제공한다. 6초마다 문답 효과를 획득하지 못할 경우, 1스택이 차감된다
     """
 
+    RARITIES = (4, 5)
+
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
             hit.add("def_pct", 0.30, (self.artifact_set, 2))

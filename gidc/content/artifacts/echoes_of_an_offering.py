@@ -13,6 +13,8 @@ class EchoesOfAnOffering(Artifact):
     0.2초 내 최대 1회 발동 여부를 판정한다
     """
 
+    RARITIES = (4, 5)
+
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
             hit.add("atk_pct", 0.18, (self.artifact_set, 2))

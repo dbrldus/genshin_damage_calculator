@@ -1,5 +1,5 @@
 from gidc.content.characters import make_character
-from gidc.core.artifact import MainStat, SubStat
+from gidc.core.artifact import SubStat
 from gidc.content.weapons import make_weapon
 from gidc.content.artifacts import make_artifact
 from gidc.enums import ArtifactSet, ArtifactSlot, StatType
@@ -17,10 +17,12 @@ def build():
     char.weapon = make_weapon(name="에슈의 재앙", refinement=5)
 
     char.flower = make_artifact(
-        artifact_set = ArtifactSet.FINALE_OF_THE_DEEP_GALLERIES,
-        slot         = ArtifactSlot.FLOWER,
-        main_stat    = MainStat(StatType.HP, 4780.0),
-        sub_stats    = [
+        artifact_set   = ArtifactSet.FINALE_OF_THE_DEEP_GALLERIES,
+        slot           = ArtifactSlot.FLOWER,
+        rarity         = 5,
+        level          = 20,
+        main_stat_type = StatType.HP,
+        sub_stats      = [
             SubStat(StatType.CRIT_DMG, 19.4),
             SubStat(StatType.ATK_PCT, 8.7),
             SubStat(StatType.CRIT_RATE,  5.4),
@@ -29,10 +31,12 @@ def build():
     )
 
     char.feather = make_artifact(
-        artifact_set = ArtifactSet.FINALE_OF_THE_DEEP_GALLERIES,
-        slot         = ArtifactSlot.FEATHER,
-        main_stat    = MainStat(StatType.ATK, 311.0),
-        sub_stats    = [
+        artifact_set   = ArtifactSet.FINALE_OF_THE_DEEP_GALLERIES,
+        slot           = ArtifactSlot.FEATHER,
+        rarity         = 5,
+        level          = 20,
+        main_stat_type = StatType.ATK,
+        sub_stats      = [
             SubStat(StatType.CRIT_DMG, 14.0),
             SubStat(StatType.CRIT_RATE, 9.7),
             SubStat(StatType.ENERGY_RECHARGE,  5.8),
@@ -41,10 +45,12 @@ def build():
     )
 
     char.sands = make_artifact(
-        artifact_set = ArtifactSet.FINALE_OF_THE_DEEP_GALLERIES,
-        slot         = ArtifactSlot.SANDS,
-        main_stat    = MainStat(StatType.ATK_PCT, 46.6),
-        sub_stats    = [
+        artifact_set   = ArtifactSet.FINALE_OF_THE_DEEP_GALLERIES,
+        slot           = ArtifactSlot.SANDS,
+        rarity         = 5,
+        level          = 20,
+        main_stat_type = StatType.ATK_PCT,
+        sub_stats      = [
             SubStat(StatType.CRIT_RATE, 10.9),
             SubStat(StatType.CRIT_DMG, 7.8),
             SubStat(StatType.ELEMENTAL_MASTERY, 40),
@@ -53,10 +59,12 @@ def build():
     )
 
     char.goblet = make_artifact(
-        artifact_set = ArtifactSet.NIGHTTIME_WHISPERS_IN_THE_ECHOING_WOODS,
-        slot         = ArtifactSlot.GOBLET,
-        main_stat    = MainStat(StatType.CRYO_DMG, 46.6),
-        sub_stats    = [
+        artifact_set   = ArtifactSet.NIGHTTIME_WHISPERS_IN_THE_ECHOING_WOODS,
+        slot           = ArtifactSlot.GOBLET,
+        rarity         = 5,
+        level          = 20,
+        main_stat_type = StatType.CRYO_DMG,
+        sub_stats      = [
             SubStat(StatType.CRIT_RATE, 14.0),
             SubStat(StatType.ATK_PCT, 9.3),
             SubStat(StatType.CRIT_DMG, 7.8),
@@ -65,10 +73,12 @@ def build():
     )
 
     char.circlet = make_artifact(
-        artifact_set = ArtifactSet.FINALE_OF_THE_DEEP_GALLERIES,
-        slot         = ArtifactSlot.CIRCLET,
-        main_stat    = MainStat(StatType.CRIT_DMG, 62.2),
-        sub_stats    = [
+        artifact_set   = ArtifactSet.FINALE_OF_THE_DEEP_GALLERIES,
+        slot           = ArtifactSlot.CIRCLET,
+        rarity         = 5,
+        level          = 20,
+        main_stat_type = StatType.CRIT_DMG,
+        sub_stats      = [
             SubStat(StatType.DEF, 19),
             SubStat(StatType.ATK, 33),
             SubStat(StatType.CRIT_RATE, 13.6),

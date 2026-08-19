@@ -41,6 +41,8 @@ class CelestialGift(Artifact):
     상술한 두 가지 원소 피해 보너스가 40%로 증가한다. 동명의 성유물 세트가 생성한 피해 보너스 효과는 중첩되지 않는다
     """
 
+    RARITIES = (4, 5)
+
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
             hit.add("energy_recharge", 0.20, (self.artifact_set, 2))

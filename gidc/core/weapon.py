@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from decimal import Decimal, ROUND_HALF_UP
 from typing import TYPE_CHECKING
 
 from gidc.enums import StatType, WeaponType
@@ -19,15 +18,8 @@ if TYPE_CHECKING:
 @dataclass(frozen=True)
 class WeaponSubStat(GearStat):
     """성유물 부옵션과 달리 값이 레벨 표에서 나오므로 소수가 딸려 온다(원소 마스터리
-    220.512). 계산에는 그 소수를 그대로 쓰고, **보여줄 때만** 게임처럼 반올림한다."""
-
-    def __str__(self) -> str:
-        # 게임 표시 자리수: %스탯은 소수 1자리, 원소 마스터리 같은 실수치는 정수.
-        # 파이썬 기본 round()는 5를 짝수 쪽으로 보내(220.5 → 220) 게임과 어긋나므로
-        # half-up으로 맞춘다 — 제례의 악장 원소 마스터리가 정확히 그 경계에 있다.
-        digits = 1 if self.is_percent else 0
-        shown  = Decimal(str(self.value)).quantize(Decimal(1).scaleb(-digits), ROUND_HALF_UP)
-        return f"{self.stat_type.value}: {shown}{'%' if self.is_percent else ''}"
+    220.512). 계산에는 그 소수를 그대로 쓰고, 보여줄 때 게임처럼 반올림하는 규칙은
+    GearStat.__str__에 있다."""
 
 
 class Weapon(ABC):

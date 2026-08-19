@@ -7,6 +7,8 @@ class Adventurer(Artifact):
     4세트: 보물 상자 개봉 시 HP 30% 회복
     """
 
+    RARITIES = (1, 2, 3)
+
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
             hit.add("hp_flat", 1000.0, (self.artifact_set, 2))

@@ -17,6 +17,8 @@ class ViridescentVenerer(Artifact):
     4세트: 확산 반응이 주는 피해가 60% 증가한다. 확산되는 원소 타입에 따라 피해 범위 내 적의 해당 원소의 내성이 40% 감소한다. 지속 시간: 10초
     """
 
+    RARITIES = (4, 5)
+
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
             hit.add("anemo_dmg_bonus", 0.15, (self.artifact_set, 2))

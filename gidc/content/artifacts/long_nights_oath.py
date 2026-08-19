@@ -10,6 +10,8 @@ class LongNightsOath(Artifact):
     「영원한 광휘」: 낙하공격으로 주는 피해가 15% 증가한다. 지속 시간: 6초, 최대 중첩수: 5스택, 스택마다 지속 시간은 독립적으로 계산한다
     """
 
+    RARITIES = (4, 5)
+
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
             hit.add("plunging_dmg_bonus", 0.25, (self.artifact_set, 2))

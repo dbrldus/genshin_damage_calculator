@@ -9,6 +9,8 @@ class VourkashasGlow(Artifact):
     최대 중첩수: 5스택. 스택마다 지속 시간은 독립적으로 계산한다. 해당 효과는 장착 캐릭터가 대기 상태일 때도 발동된다
     """
 
+    RARITIES = (4, 5)
+
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
             hit.add("hp_pct", 0.20, (self.artifact_set, 2))

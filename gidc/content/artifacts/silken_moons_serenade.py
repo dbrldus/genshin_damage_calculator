@@ -20,6 +20,8 @@ class SilkenMoonsSerenade(Artifact):
     파티 내 모든 캐릭터가 발동한 달빛 반응으로 주는 피해가 10% 증가한다. 「월광」으로 생성된 효과는 중첩되지 않는다
     """
 
+    RARITIES = (4, 5)
+
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
             hit.add("energy_recharge", 0.20, (self.artifact_set, 2))

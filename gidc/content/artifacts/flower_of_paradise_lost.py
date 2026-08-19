@@ -10,6 +10,8 @@ class FlowerOfParadiseLost(Artifact):
     지속 시간: 10초. 최대 중첩수: 4회. 해당 효과는 1초마다 최대 1회 발동되며, 장착 캐릭터가 대기 상태일 때도 발동된다
     """
 
+    RARITIES = (4, 5)
+
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
             hit.add("elemental_mastery", 80, (self.artifact_set, 2))

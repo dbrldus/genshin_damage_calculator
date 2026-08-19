@@ -8,6 +8,8 @@ class DisenchantmentInDeepShadow(Artifact):
     4세트: 초전도 반응 피해 +80%, 별 초천도 반응 피해 +40%, 적이 초전도 또는 별 초전도 반응의 영향을 받으면 공격의 치명타 확률 +16%
     """
 
+    RARITIES = (4, 5)
+
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
             hit.add("atk_pct", 0.18, (self.artifact_set, 2))

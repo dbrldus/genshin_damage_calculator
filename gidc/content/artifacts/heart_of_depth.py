@@ -8,6 +8,8 @@ class HeartOfDepth(Artifact):
     4세트: 원소전투 스킬 발동 후 15초 동안 일반 공격과 강공격으로 주는 피해가 30% 증가한다
     """
 
+    RARITIES = (4, 5)
+
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
             hit.add("hydro_dmg_bonus", 0.15, (self.artifact_set, 2))

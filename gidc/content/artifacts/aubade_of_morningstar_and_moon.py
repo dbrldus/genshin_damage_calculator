@@ -12,6 +12,8 @@ class AubadeOfMorningstarAndMoon(Artifact):
     상술한 효과는 장착 캐릭터가 필드에 등장 후 3초가 지나면 사라진다
     """
 
+    RARITIES = (4, 5)
+
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
             hit.add("elemental_mastery", 80, (self.artifact_set, 2))

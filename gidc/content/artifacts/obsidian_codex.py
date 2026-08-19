@@ -8,6 +8,8 @@ class ObsidianCodex(Artifact):
     4세트: 장착 캐릭터가 필드 위에서 밤혼을 1pt 소모한 후, 치명타 확률이 40% 증가한다. 지속시간: 6초. 해당 효과는 1초마다 최대 1회 발동된다.
     """
 
+    RARITIES = (4, 5)
+
     def apply_2set(self, all_hits, wearer) -> None:
         if ask_bool("[흑요석 비전 2세트] 온필드 밤혼 가호 상태?"):
             for hit in all_hits[wearer].values():

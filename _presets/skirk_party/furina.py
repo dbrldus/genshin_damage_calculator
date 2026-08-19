@@ -1,5 +1,5 @@
 from gidc.content.characters import make_character
-from gidc.core.artifact import MainStat, SubStat
+from gidc.core.artifact import SubStat
 from gidc.content.weapons import make_weapon
 from gidc.content.artifacts import make_artifact
 from gidc.enums import ArtifactSet, ArtifactSlot, StatType
@@ -17,10 +17,12 @@ def build():
     char.weapon = make_weapon(name="페보니우스 검", refinement=5)
 
     char.flower = make_artifact(
-        artifact_set = ArtifactSet.TENACITY_OF_THE_MILLELITH,
-        slot         = ArtifactSlot.FLOWER,
-        main_stat    = MainStat(StatType.HP, 4780.0),
-        sub_stats    = [
+        artifact_set   = ArtifactSet.TENACITY_OF_THE_MILLELITH,
+        slot           = ArtifactSlot.FLOWER,
+        rarity         = 5,
+        level          = 20,
+        main_stat_type = StatType.HP,
+        sub_stats      = [
             SubStat(StatType.ENERGY_RECHARGE, 13.0),
             SubStat(StatType.CRIT_RATE, 3.1),
             SubStat(StatType.HP_PCT, 5.3),
@@ -29,10 +31,12 @@ def build():
     )
 
     char.feather = make_artifact(
-        artifact_set = ArtifactSet.TENACITY_OF_THE_MILLELITH,
-        slot         = ArtifactSlot.FEATHER,
-        main_stat    = MainStat(StatType.ATK, 311.0),
-        sub_stats    = [
+        artifact_set   = ArtifactSet.TENACITY_OF_THE_MILLELITH,
+        slot           = ArtifactSlot.FEATHER,
+        rarity         = 5,
+        level          = 20,
+        main_stat_type = StatType.ATK,
+        sub_stats      = [
             SubStat(StatType.HP_PCT, 19.2),
             SubStat(StatType.ENERGY_RECHARGE, 5.2),
             SubStat(StatType.ELEMENTAL_MASTERY,  42),
@@ -41,10 +45,12 @@ def build():
     )
 
     char.sands = make_artifact(
-        artifact_set = ArtifactSet.TENACITY_OF_THE_MILLELITH,
-        slot         = ArtifactSlot.SANDS,
-        main_stat    = MainStat(StatType.ENERGY_RECHARGE, 51.8),
-        sub_stats    = [
+        artifact_set   = ArtifactSet.TENACITY_OF_THE_MILLELITH,
+        slot           = ArtifactSlot.SANDS,
+        rarity         = 5,
+        level          = 20,
+        main_stat_type = StatType.ENERGY_RECHARGE,
+        sub_stats      = [
             SubStat(StatType.DEF_PCT, 7.3),
             SubStat(StatType.ATK_PCT, 5.8),
             SubStat(StatType.CRIT_RATE, 8.9),
@@ -53,10 +59,12 @@ def build():
     )
 
     char.goblet = make_artifact(
-        artifact_set = ArtifactSet.A_DAY_CARVED_FROM_RISING_WINDS,
-        slot         = ArtifactSlot.GOBLET,
-        main_stat    = MainStat(StatType.HP_PCT, 46.6),
-        sub_stats    = [
+        artifact_set   = ArtifactSet.A_DAY_CARVED_FROM_RISING_WINDS,
+        slot           = ArtifactSlot.GOBLET,
+        rarity         = 5,
+        level          = 20,
+        main_stat_type = StatType.HP_PCT,
+        sub_stats      = [
             SubStat(StatType.HP, 209),
             SubStat(StatType.CRIT_RATE,        3.5),
             SubStat(StatType.ENERGY_RECHARGE,  33.7),
@@ -65,10 +73,12 @@ def build():
     )
 
     char.circlet = make_artifact(
-        artifact_set = ArtifactSet.TENACITY_OF_THE_MILLELITH,
-        slot         = ArtifactSlot.CIRCLET,
-        main_stat    = MainStat(StatType.CRIT_RATE, 31.1),
-        sub_stats    = [
+        artifact_set   = ArtifactSet.TENACITY_OF_THE_MILLELITH,
+        slot           = ArtifactSlot.CIRCLET,
+        rarity         = 5,
+        level          = 20,
+        main_stat_type = StatType.CRIT_RATE,
+        sub_stats      = [
             SubStat(StatType.ATK_PCT,         19),
             SubStat(StatType.HP,        807),
             SubStat(StatType.CRIT_DMG,  7.0),

@@ -8,6 +8,8 @@ class Berserker(Artifact):
     4세트: HP 70% 미만 시 치명타 확률이 추가로 24% 증가한다
     """
 
+    RARITIES = (3, 4)
+
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
             hit.add("crit_rate", 0.12, (self.artifact_set, 2))

@@ -11,6 +11,8 @@ class ScrollOfTheHeroOfCinderCity(Artifact):
     지속 시간: 20초. 장착 캐릭터가 대기 상태일 때도 상술한 효과를 발동할 수 있다. 동명의 성유물 세트가 생성한 피해 보너스 효과는 중첩되지 않는다.
     """
 
+    RARITIES = (4, 5)
+
     def apply_2set(self, all_hits, wearer) -> None:
         pass
 

@@ -1,9 +1,9 @@
-from gidc.core.artifact import Artifact, MainStat, SubStat
-from gidc.enums import ArtifactSet, ArtifactSlot
+from gidc.core.artifact import Artifact, SubStat
+from gidc.enums import ArtifactSet, ArtifactSlot, StatType
 
 from ._default import DefaultArtifact
 
-# ── 5성 세트 (최신순) ─────────────────────────────────────────────────────────
+# ── 4~5성 세트 (최신순) ───────────────────────────────────────────────────────
 from .disenchantment_in_deep_shadow import DisenchantmentInDeepShadow
 from .celestial_gift import CelestialGift
 from .a_day_carved_from_rising_winds import ADayCarvedFromRisingWinds
@@ -49,7 +49,13 @@ from .thundering_fury import ThunderingFury
 from .wanderers_troupe import WanderersTroupe
 from .gladiators_finale import GladiatorsFinale
 
-# ── 4성 세트 (일반) ───────────────────────────────────────────────────────────
+# ── 3~4성 세트 (기도) ─────────────────────────────────────────────────────────
+from .prayers_to_springtime import PrayersToSpringtime
+from .prayers_for_illumination import PrayersForIllumination
+from .prayers_for_destiny import PrayersForDestiny
+from .prayers_for_wisdom import PrayersForWisdom
+
+# ── 3~4성 세트 (일반) ─────────────────────────────────────────────────────────
 from .scholar import Scholar
 from .gambler import Gambler
 from .martial_artist import MartialArtist
@@ -61,13 +67,13 @@ from .berserker import Berserker
 from .tiny_miracle import TinyMiracle
 from .resolution_of_sojourner import ResolutionOfSojourner
 
-# ── 3성 세트 (일반) ───────────────────────────────────────────────────────────
+# ── 1~3성 세트 (일반) ─────────────────────────────────────────────────────────
 from .traveling_doctor import TravelingDoctor
 from .lucky_dog import LuckyDog
 from .adventurer import Adventurer
 
 ARTIFACT_REGISTRY: dict[ArtifactSet, type[Artifact]] = {
-    # ── 5성 세트 (최신순) ─────────────────────────────────────────────────────
+    # ── 4~5성 세트 (최신순) ───────────────────────────────────────────────────
     ArtifactSet.DISENCHANTMENT_IN_DEEP_SHADOW:           DisenchantmentInDeepShadow,
     ArtifactSet.CELESTIAL_GIFT:                          CelestialGift,
     ArtifactSet.A_DAY_CARVED_FROM_RISING_WINDS:          ADayCarvedFromRisingWinds,
@@ -112,12 +118,12 @@ ARTIFACT_REGISTRY: dict[ArtifactSet, type[Artifact]] = {
     ArtifactSet.THUNDERING_FURY:                         ThunderingFury,
     ArtifactSet.WANDERERS_TROUPE:                        WanderersTroupe,
     ArtifactSet.GLADIATORS_FINALE:                       GladiatorsFinale,
-    # ── 4성 세트 (기도) ───────────────────────────────────────────────────────
-    ArtifactSet.PRAYERS_TO_SPRINGTIME:                   DefaultArtifact,
-    ArtifactSet.PRAYERS_FOR_ILLUMINATION:                DefaultArtifact,
-    ArtifactSet.PRAYERS_FOR_DESTINY:                     DefaultArtifact,
-    ArtifactSet.PRAYERS_FOR_WISDOM:                      DefaultArtifact,
-    # ── 4성 세트 (일반) ───────────────────────────────────────────────────────
+    # ── 3~4성 세트 (기도) ─────────────────────────────────────────────────────
+    ArtifactSet.PRAYERS_TO_SPRINGTIME:                   PrayersToSpringtime,
+    ArtifactSet.PRAYERS_FOR_ILLUMINATION:                PrayersForIllumination,
+    ArtifactSet.PRAYERS_FOR_DESTINY:                     PrayersForDestiny,
+    ArtifactSet.PRAYERS_FOR_WISDOM:                      PrayersForWisdom,
+    # ── 3~4성 세트 (일반) ─────────────────────────────────────────────────────
     ArtifactSet.SCHOLAR:                                 Scholar,
     ArtifactSet.GAMBLER:                                 Gambler,
     ArtifactSet.MARTIAL_ARTIST:                          MartialArtist,
@@ -128,18 +134,26 @@ ARTIFACT_REGISTRY: dict[ArtifactSet, type[Artifact]] = {
     ArtifactSet.BERSERKER:                               Berserker,
     ArtifactSet.TINY_MIRACLE:                            TinyMiracle,
     ArtifactSet.RESOLUTION_OF_SOJOURNER:                 ResolutionOfSojourner,
-    # ── 3성 세트 (일반) ───────────────────────────────────────────────────────
+    # ── 1~3성 세트 (일반) ─────────────────────────────────────────────────────
     ArtifactSet.TRAVELING_DOCTOR:                        TravelingDoctor,
     ArtifactSet.LUCKY_DOG:                               LuckyDog,
     ArtifactSet.ADVENTURER:                              Adventurer,
 }
 
 
+def artifact_class(artifact_set: ArtifactSet) -> type[Artifact]:
+    """세트 → 구현 클래스. 세트가 선언한 것(허용 성급 등)을 만들기 전에 읽어야 할 때 쓴다."""
+    return ARTIFACT_REGISTRY.get(artifact_set, DefaultArtifact)
+
+
 def make_artifact(
     artifact_set: ArtifactSet,
     slot: ArtifactSlot,
-    main_stat: MainStat,
+    main_stat_type: StatType,
     sub_stats: list[SubStat],
+    rarity: int | None = None,
+    level: int | None = None,
 ) -> Artifact:
-    cls = ARTIFACT_REGISTRY.get(artifact_set, DefaultArtifact)
-    return cls(artifact_set, slot, main_stat, sub_stats)
+    return artifact_class(artifact_set)(
+        artifact_set, slot, main_stat_type, sub_stats, rarity, level
+    )

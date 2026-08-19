@@ -8,6 +8,8 @@ class NighttimeWhispersInTheEchoingWoods(Artifact):
     4세트: 원소 스킬 사용 후 바위 원소 피해 보너스 +20%, 결정 보호막 존재 시 추가 +30%
     """
 
+    RARITIES = (4, 5)
+
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
             hit.add("atk_pct", 0.18, (self.artifact_set, 2))

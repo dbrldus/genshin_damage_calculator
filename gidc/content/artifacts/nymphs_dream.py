@@ -10,6 +10,8 @@ class NymphsDream(Artifact):
     일반 공격, 강공격, 낙하 공격, 원소전투 스킬 또는 원소폭발이 생성한 「거울 속 님프」는 각각 독립적으로 존재한다
     """
 
+    RARITIES = (4, 5)
+
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
             hit.add("hydro_dmg_bonus", 0.15, (self.artifact_set, 2))

@@ -8,6 +8,8 @@ class WanderersTroupe(Artifact):
     4세트: 법구·활 사용 시 강공격 피해 +35%
     """
 
+    RARITIES = (4, 5)
+
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
             hit.add("elemental_mastery", 80, (self.artifact_set, 2))

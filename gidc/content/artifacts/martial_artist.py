@@ -8,6 +8,8 @@ class MartialArtist(Artifact):
     4세트: 원소 스킬 사용 후 8초 이내 일반·강공격 피해 보너스 +25%
     """
 
+    RARITIES = (3, 4)
+
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
             hit.add("normal_atk_dmg_bonus", 0.15, (self.artifact_set, 2))

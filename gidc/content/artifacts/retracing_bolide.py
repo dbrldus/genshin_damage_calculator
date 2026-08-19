@@ -8,6 +8,8 @@ class RetracingBolide(Artifact):
     4세트: 보호막이 존재 시 추가로 일반 공격과 강공격 보너스를 40% 획득한다
     """
 
+    RARITIES = (4, 5)
+
     def apply_2set(self, all_hits, wearer) -> None:
         pass
 

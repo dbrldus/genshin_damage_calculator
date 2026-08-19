@@ -11,6 +11,7 @@
 Artifact와 Weapon이 이 베이스를 공유하므로 두 곳의 규칙이 갈라지지 않는다.
 """
 from dataclasses import dataclass
+from decimal import Decimal, ROUND_HALF_UP
 
 from gidc.enums import StatType, PERCENT_STAT_TYPES, PERCENT_SCALE
 
@@ -31,4 +32,11 @@ class GearStat:
         return self.value * PERCENT_SCALE if self.is_percent else self.value
 
     def __str__(self) -> str:
-        return f"{self.stat_type.value}: {self.value}{'%' if self.is_percent else ''}"
+        # 계산에는 표에서 나온 소수를 그대로 쓰고(성유물 주옵션 원소 마스터리 186.5,
+        # 무기 부옵션 220.512), **보여줄 때만** 게임처럼 반올림한다. 게임 표시 자리수는
+        # %스탯이 소수 1자리, 실수치가 정수다. 파이썬 기본 round()는 5를 짝수 쪽으로
+        # 보내(220.5 → 220) 게임과 어긋나므로 half-up으로 맞춘다 — 제례의 악장 원소
+        # 마스터리가 정확히 그 경계에 있다.
+        digits = 1 if self.is_percent else 0
+        shown  = Decimal(str(self.value)).quantize(Decimal(1).scaleb(-digits), ROUND_HALF_UP)
+        return f"{self.stat_type.value}: {shown}{'%' if self.is_percent else ''}"

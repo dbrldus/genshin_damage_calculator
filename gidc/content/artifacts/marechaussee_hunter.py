@@ -8,6 +8,8 @@ class MarechausseeHunter(Artifact):
     4세트: 캐릭터의 현재 HP에 변화가 생기면 치명타 확률이 12% 증가한다. 지속 시간: 5초, 최대 중첩수: 3회
     """
 
+    RARITIES = (4, 5)
+
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
             hit.add("normal_atk_dmg_bonus", 0.15, (self.artifact_set, 2))

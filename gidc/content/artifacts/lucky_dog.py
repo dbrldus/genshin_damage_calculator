@@ -7,6 +7,8 @@ class LuckyDog(Artifact):
     4세트: 모라 획득 시 HP를 300pt 회복한다
     """
 
+    RARITIES = (1, 2, 3)
+
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
             hit.add("def_flat", 100.0, (self.artifact_set, 2))

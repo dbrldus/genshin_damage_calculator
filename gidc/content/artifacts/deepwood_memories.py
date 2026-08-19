@@ -9,6 +9,8 @@ class DeepwoodMemories(Artifact):
     장착 캐릭터가 대기 상태일 때도 해당 효과는 발동된다
     """
 
+    RARITIES = (4, 5)
+
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
             hit.add("dendro_dmg_bonus", 0.15, (self.artifact_set, 2))

@@ -9,6 +9,8 @@ class CrimsonWitchOfFlames(Artifact):
     원소전투 스킬 발동 후 10초 동안 2세트의 효과가 50% 증가한다. 최대 중첩수: 3회
     """
 
+    RARITIES = (4, 5)
+
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
             hit.add("pyro_dmg_bonus", 0.15, (self.artifact_set, 2))

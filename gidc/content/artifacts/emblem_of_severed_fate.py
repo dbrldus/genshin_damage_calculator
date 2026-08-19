@@ -7,6 +7,8 @@ class EmblemOfSeveredFate(Artifact):
     4세트: 원소폭발로 주는 피해가 원소 충전 효율의 25%만큼 증가한다. 해당 방식으로 최대 75%까지 증가할 수 있다
     """
 
+    RARITIES = (4, 5)
+
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
             hit.add("energy_recharge", 0.20, (self.artifact_set, 2))

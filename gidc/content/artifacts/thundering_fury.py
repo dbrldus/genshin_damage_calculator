@@ -8,6 +8,8 @@ class ThunderingFury(Artifact):
     위와 같은 원소 반응 또는 활성화 반응 발동 시, 원소전투 스킬의 재사용 대기시간이 1초 줄어든다. 해당 효과는 0.8초마다 최대 1회 발동한다
     """
 
+    RARITIES = (4, 5)
+
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
             hit.add("electro_dmg_bonus", 0.15, (self.artifact_set, 2))

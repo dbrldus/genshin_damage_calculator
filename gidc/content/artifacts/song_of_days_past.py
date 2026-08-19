@@ -13,6 +13,8 @@ class SongOfDaysPast(Artifact):
     여러 장착 캐릭터가 생성한 회복량을 기록할 수 있다. 장착 캐릭터가 대기 상태일 때도 해당 효과는 발동된다
     """
 
+    RARITIES = (4, 5)
+
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
             hit.add("healing_bonus", 0.15, (self.artifact_set, 2))

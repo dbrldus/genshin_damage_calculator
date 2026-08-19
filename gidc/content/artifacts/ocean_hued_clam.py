@@ -12,6 +12,8 @@ class OceanHuedClam(Artifact):
     자신의 파티에 바다에 물든 거품은 동시에 1개만 존재할 수 있다. 해당 성유물 세트를 장착한 캐릭터가 대기 상태일 때도 해당 효과가 발동한다
     """
 
+    RARITIES = (4, 5)
+
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
             hit.add("healing_bonus", 0.15, (self.artifact_set, 2))

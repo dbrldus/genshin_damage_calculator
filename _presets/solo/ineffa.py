@@ -1,5 +1,5 @@
 from gidc.content.characters import make_character
-from gidc.core.artifact import MainStat, SubStat
+from gidc.core.artifact import SubStat
 from gidc.core.weapon import WeaponSubStat
 from gidc.content.weapons import make_weapon
 from gidc.content.artifacts import make_artifact
@@ -19,10 +19,12 @@ def build():
     char.weapon = make_weapon(name = "채굴의 삽", refinement = 4)
 
     char.flower = make_artifact(
-        artifact_set = ArtifactSet.SILKEN_MOONS_SERENADE,
-        slot         = ArtifactSlot.FLOWER,
-        main_stat    = MainStat(StatType.HP, 4780.0),
-        sub_stats    = [
+        artifact_set   = ArtifactSet.SILKEN_MOONS_SERENADE,
+        slot           = ArtifactSlot.FLOWER,
+        rarity         = 5,
+        level          = 20,
+        main_stat_type = StatType.HP,
+        sub_stats      = [
             SubStat(StatType.CRIT_DMG,   22.5),
             SubStat(StatType.DEF,       16),
             SubStat(StatType.DEF_PCT, 5.8),
@@ -31,10 +33,12 @@ def build():
     )
 
     char.feather = make_artifact(
-        artifact_set = ArtifactSet.SILKEN_MOONS_SERENADE,
-        slot         = ArtifactSlot.FEATHER,
-        main_stat    = MainStat(StatType.ATK, 311.0),
-        sub_stats    = [
+        artifact_set   = ArtifactSet.SILKEN_MOONS_SERENADE,
+        slot           = ArtifactSlot.FEATHER,
+        rarity         = 5,
+        level          = 20,
+        main_stat_type = StatType.ATK,
+        sub_stats      = [
             SubStat(StatType.CRIT_DMG,        13.2),
             SubStat(StatType.ATK_PCT,          9.9),
             SubStat(StatType.CRIT_RATE, 6.6),
@@ -43,10 +47,12 @@ def build():
     )
 
     char.sands = make_artifact(
-        artifact_set = ArtifactSet.SILKEN_MOONS_SERENADE,
-        slot         = ArtifactSlot.SANDS,
-        main_stat    = MainStat(StatType.ATK_PCT, 46.6),
-        sub_stats    = [
+        artifact_set   = ArtifactSet.SILKEN_MOONS_SERENADE,
+        slot           = ArtifactSlot.SANDS,
+        rarity         = 5,
+        level          = 20,
+        main_stat_type = StatType.ATK_PCT,
+        sub_stats      = [
             SubStat(StatType.DEF,        53),
             SubStat(StatType.CRIT_RATE,        3.1),
             SubStat(StatType.ENERGY_RECHARGE,  11.7),
@@ -55,10 +61,12 @@ def build():
     )
 
     char.goblet = make_artifact(
-        artifact_set = ArtifactSet.SONG_OF_DAYS_PAST,
-        slot         = ArtifactSlot.GOBLET,
-        main_stat    = MainStat(StatType.ATK_PCT, 46.6),
-        sub_stats    = [
+        artifact_set   = ArtifactSet.SONG_OF_DAYS_PAST,
+        slot           = ArtifactSlot.GOBLET,
+        rarity         = 5,
+        level          = 20,
+        main_stat_type = StatType.ATK_PCT,
+        sub_stats      = [
             SubStat(StatType.CRIT_RATE,       17.9),
             SubStat(StatType.ELEMENTAL_MASTERY, 44),
             SubStat(StatType.DEF,             21),
@@ -67,10 +75,12 @@ def build():
     )
 
     char.circlet = make_artifact(
-        artifact_set = ArtifactSet.SILKEN_MOONS_SERENADE,
-        slot         = ArtifactSlot.CIRCLET,
-        main_stat    = MainStat(StatType.CRIT_DMG, 62.2),
-        sub_stats    = [
+        artifact_set   = ArtifactSet.SILKEN_MOONS_SERENADE,
+        slot           = ArtifactSlot.CIRCLET,
+        rarity         = 5,
+        level          = 20,
+        main_stat_type = StatType.CRIT_DMG,
+        sub_stats      = [
             SubStat(StatType.ATK,         14),
             SubStat(StatType.ENERGY_RECHARGE,  22.7),
             SubStat(StatType.DEF_PCT,          10.9),

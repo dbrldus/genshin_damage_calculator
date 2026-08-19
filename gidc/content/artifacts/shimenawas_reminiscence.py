@@ -9,6 +9,8 @@ class ShimenawasReminiscence(Artifact):
     그 후 10초 동안 일반 공격, 강공격, 낙하 공격으로 주는 피해가 50% 증가한다. 지속 기간 내에 해당 효과는 다시 발동하지 않는다
     """
 
+    RARITIES = (4, 5)
+
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
             hit.add("atk_pct", 0.18, (self.artifact_set, 2))

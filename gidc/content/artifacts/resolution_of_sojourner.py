@@ -8,6 +8,8 @@ class ResolutionOfSojourner(Artifact):
     4세트: 강공격 치명타 확률 +30%
     """
 
+    RARITIES = (3, 4)
+
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
             hit.add("atk_pct", 0.18, (self.artifact_set, 2))

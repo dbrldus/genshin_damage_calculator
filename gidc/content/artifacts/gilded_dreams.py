@@ -12,6 +12,8 @@ class GildedDreams(Artifact):
     해당 세트 효과는 12초에 1번씩 발동할 수 있다. 장착 캐릭터가 대기 상태일 때도 해당 효과가 발동된다
     """
 
+    RARITIES = (4, 5)
+
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
             hit.add("elemental_mastery", 80, (self.artifact_set, 2))

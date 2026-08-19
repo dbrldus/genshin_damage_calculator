@@ -1,5 +1,5 @@
 from gidc.content.characters import make_character
-from gidc.core.artifact import MainStat, SubStat
+from gidc.core.artifact import SubStat
 from gidc.content.weapons import make_weapon
 from gidc.content.artifacts import make_artifact
 from gidc.enums import ArtifactSet, ArtifactSlot, StatType
@@ -17,10 +17,12 @@ def build():
     char.weapon = make_weapon(name="바위산을 맴도는 노래", refinement=1)
 
     char.flower = make_artifact(
-        artifact_set = ArtifactSet.SCROLL_OF_THE_HERO_OF_CINDER_CITY,
-        slot         = ArtifactSlot.FLOWER,
-        main_stat    = MainStat(StatType.HP, 4780.0),
-        sub_stats    = [
+        artifact_set   = ArtifactSet.SCROLL_OF_THE_HERO_OF_CINDER_CITY,
+        slot           = ArtifactSlot.FLOWER,
+        rarity         = 5,
+        level          = 20,
+        main_stat_type = StatType.HP,
+        sub_stats      = [
             SubStat(StatType.ELEMENTAL_MASTERY,       37),
             SubStat(StatType.ENERGY_RECHARGE, 15.5),
             SubStat(StatType.DEF_PCT, 13.1),
@@ -29,10 +31,12 @@ def build():
     )
 
     char.feather = make_artifact(
-        artifact_set = ArtifactSet.SCROLL_OF_THE_HERO_OF_CINDER_CITY,
-        slot         = ArtifactSlot.FEATHER,
-        main_stat    = MainStat(StatType.ATK, 311.0),
-        sub_stats    = [
+        artifact_set   = ArtifactSet.SCROLL_OF_THE_HERO_OF_CINDER_CITY,
+        slot           = ArtifactSlot.FEATHER,
+        rarity         = 5,
+        level          = 20,
+        main_stat_type = StatType.ATK,
+        sub_stats      = [
             SubStat(StatType.CRIT_DMG, 17.1),
             SubStat(StatType.DEF_PCT, 11.7),
             SubStat(StatType.HP, 508),
@@ -41,10 +45,12 @@ def build():
     )
 
     char.sands = make_artifact(
-        artifact_set = ArtifactSet.SCROLL_OF_THE_HERO_OF_CINDER_CITY,
-        slot         = ArtifactSlot.SANDS,
-        main_stat    = MainStat(StatType.DEF_PCT, 58.3),
-        sub_stats    = [
+        artifact_set   = ArtifactSet.SCROLL_OF_THE_HERO_OF_CINDER_CITY,
+        slot           = ArtifactSlot.SANDS,
+        rarity         = 5,
+        level          = 20,
+        main_stat_type = StatType.DEF_PCT,
+        sub_stats      = [
             SubStat(StatType.DEF, 39),
             SubStat(StatType.ENERGY_RECHARGE, 10.4),
             SubStat(StatType.CRIT_DMG, 19.4),
@@ -53,10 +59,12 @@ def build():
     )
 
     char.goblet = make_artifact(
-        artifact_set = ArtifactSet.SCROLL_OF_THE_HERO_OF_CINDER_CITY,
-        slot         = ArtifactSlot.GOBLET,
-        main_stat    = MainStat(StatType.DEF_PCT, 58.3),
-        sub_stats    = [
+        artifact_set   = ArtifactSet.SCROLL_OF_THE_HERO_OF_CINDER_CITY,
+        slot           = ArtifactSlot.GOBLET,
+        rarity         = 5,
+        level          = 20,
+        main_stat_type = StatType.DEF_PCT,
+        sub_stats      = [
             SubStat(StatType.DEF, 23),
             SubStat(StatType.CRIT_DMG,        11.7),
             SubStat(StatType.ENERGY_RECHARGE,  18.1),
@@ -65,10 +73,12 @@ def build():
     )
 
     char.circlet = make_artifact(
-        artifact_set = ArtifactSet.SCROLL_OF_THE_HERO_OF_CINDER_CITY,
-        slot         = ArtifactSlot.CIRCLET,
-        main_stat    = MainStat(StatType.DEF_PCT, 58.3),
-        sub_stats    = [
+        artifact_set   = ArtifactSet.SCROLL_OF_THE_HERO_OF_CINDER_CITY,
+        slot           = ArtifactSlot.CIRCLET,
+        rarity         = 5,
+        level          = 20,
+        main_stat_type = StatType.DEF_PCT,
+        sub_stats      = [
             SubStat(StatType.CRIT_DMG, 6.2),
             SubStat(StatType.ENERGY_RECHARGE,  13.0),
             SubStat(StatType.CRIT_RATE, 7.0),

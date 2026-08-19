@@ -8,6 +8,8 @@ class BlizzardStrayer(Artifact):
     4세트: 얼음 원소의 영향을 받은 적을 공격 시 치명타 확률이 20% 증가한다. 만약 적이 빙결 상태라면 치명타 확률이 추가로 20% 증가한다
     """
 
+    RARITIES = (4, 5)
+
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
             hit.add("cryo_dmg_bonus", 0.15, (self.artifact_set, 2))

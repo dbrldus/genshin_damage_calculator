@@ -14,12 +14,14 @@ JS 쪽은 .toJs() 한 번으로 끝난다.
       "traits": ["HEXEREI"],
       "weapon": { "name": "에슈의 재앙", "refinement": 5, "level": 90, "ascension": 6 },
       "artifacts": {
-        "flower": { "set": "FINALE_OF_THE_DEEP_GALLERIES",
-                    "main": { "stat": "HP", "value": 4780 },
+        "flower": { "set": "FINALE_OF_THE_DEEP_GALLERIES", "rarity": 5, "level": 20,
+                    "main": { "stat": "HP" },
                     "subs": [ { "stat": "CRIT_DMG", "value": 19.4 }, ... ] },
         "feather": ..., "sands": ..., "goblet": ..., "circlet": ... } }
 
 슬롯 키는 ArtifactSlot 멤버명의 소문자이고, 그대로 Character의 속성명이기도 하다.
+주옵션에 값이 없는 것은 성급과 강화 레벨로 정해지기 때문이다(core/artifact_scaling.py).
+부옵션은 반대로 레벨로 정해지지 않으므로 값을 그대로 적는다.
 
 호출 흐름 (답변 수렴 루프):
 
@@ -35,9 +37,11 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 
-from gidc.core.artifact import _INVALID_SUB_STATS, _VALID_MAIN_STATS, MainStat, SubStat
+from gidc.core.artifact import (
+    _INVALID_SUB_STATS, _VALID_MAIN_STATS, Artifact, SubStat,
+)
 from gidc.core.character import Character
-from gidc.core import weapon_scaling
+from gidc.core import artifact_scaling, weapon_scaling
 from gidc.core.ascension import MAX_LEVEL, phases_for_level, resolve_phase
 from gidc.core.damage import calculate
 from gidc.core.enemy import Enemy
@@ -57,9 +61,10 @@ from gidc.core.reaction import (
     suppressed_transformatives, transformative_candidates,
 )
 from gidc.enums import (
-    ArtifactSet, ArtifactSlot, CharacterTrait, Element, ReactionType, StatType,
+    ArtifactSet, ArtifactSlot, CharacterTrait, Element, PERCENT_STAT_TYPES,
+    ReactionType, StatType,
 )
-from gidc.content.artifacts import ARTIFACT_REGISTRY, make_artifact
+from gidc.content.artifacts import ARTIFACT_REGISTRY, artifact_class, make_artifact
 from gidc.content.characters import CHARACTER_REGISTRY, make_character
 from gidc.content.weapons import WEAPON_REGISTRY, make_weapon
 from gidc.prompt import MappingSource, using
@@ -83,15 +88,30 @@ def get_registries() -> dict:
     return {
         "characters":   _characters(),
         "weapons":      _weapons(),
-        "artifactSets": [{"id": s.name, "label": s.value} for s in ArtifactSet],
+        # 세트마다 있는 성급과 부위가 다르다(모험가는 1~3성, 기도 4종은 관 하나뿐이다).
+        # 선언은 세트 파일이 갖고 있고(Artifact.RARITIES / SLOTS) 여기서는 그대로 펴 준다.
+        "artifactSets": [{"id": s.name, "label": s.value,
+                          "rarities": list(artifact_class(s).RARITIES),
+                          "slots": [x.name.lower() for x in artifact_class(s).SLOTS]}
+                         for s in ArtifactSet],
         "slots":        [{"key": s.name.lower(), "label": s.value} for s in ArtifactSlot],
-        "statTypes":    [{"id": s.name, "label": s.value} for s in StatType],
+        # percent 는 게임 화면의 표기 규칙이다 — %스탯은 소수 1자리, 실수치는 정수.
+        # 화면이 주옵션 값을 그려야 하는데, 어느 스탯이 %인지를 JS가 따로 들고 있으면
+        # 엔진의 PERCENT_STAT_TYPES와 조용히 어긋난다.
+        "statTypes":    [{"id": s.name, "label": s.value,
+                          "percent": s in PERCENT_STAT_TYPES} for s in StatType],
         # 부위별 허용 주옵션 / 부옵션 — 엔진의 검증 테이블을 그대로 노출한다.
         "validMainStats": {
             slot.name.lower(): sorted(s.name for s in stats)
             for slot, stats in _VALID_MAIN_STATS.items()
         },
         "validSubStats": sorted(s.name for s in StatType if s not in _INVALID_SUB_STATS),
+        # 부옵션 줄 수는 상한만 있다 — 강화가 덜 된 성유물은 네 줄이 다 차 있지 않다.
+        "maxSubStats": Artifact.MAX_SUB_STATS,
+        # 성유물 주옵션 값 표 — (성급, 스탯) → 강화 레벨 0..N의 값. 화면이 고른 레벨의
+        # 값을 곧바로 보여줄 수 있어야 해서 표를 통째로 넘긴다(레벨을 바꿀 때마다 엔진에
+        # 물으러 가지 않는다). 배열 길이가 곧 그 성급의 강화 상한 + 1이다.
+        "artifactMainStat": _artifact_main_stat_table(),
         # 레벨 → 고를 수 있는 돌파 단계. 상한 레벨(20/40/50/60/70/80)만 둘이고
         # 나머지는 하나다. 규칙을 JS가 베껴 쓰지 않도록 표를 통째로 넘긴다.
         "ascensionPhases": {
@@ -154,6 +174,21 @@ def _weapons() -> list[dict]:
     return out
 
 
+def _artifact_main_stat_table() -> dict:
+    """성급 → {주옵션 스탯: [강화 +0, +1, …]}. 값은 게임 표기 단위다.
+
+    부위별로 실제 붙을 수 있는 주옵션은 validMainStats가 따로 좁힌다 — 여기 표는
+    「그 성급에서 그 스탯이 주옵션이면 얼마인가」만 답한다."""
+    return {
+        str(rarity): {
+            stat.name: [artifact_scaling.main_stat_value(stat, rarity, lv)
+                        for lv in range(artifact_scaling.max_level(rarity) + 1)]
+            for stat in sorted(artifact_scaling.main_stats(rarity), key=lambda s: s.name)
+        }
+        for rarity in artifact_scaling.rarities()
+    }
+
+
 def _weapon_levels() -> dict:
     """성급 → {최대 레벨, 레벨별 고를 수 있는 돌파 단계}.
 
@@ -213,16 +248,20 @@ def _artifact_to_spec(art) -> dict | None:
     if art is None:
         return None
     return {
-        "set":  art.artifact_set.name,
-        "main": {"stat": art.main_stat.stat_type.name, "value": art.main_stat.value},
-        "subs": [{"stat": s.stat_type.name, "value": s.value} for s in art.sub_stats],
+        "set":    art.artifact_set.name,
+        "rarity": art.rarity,
+        "level":  art.level,
+        # 주옵션은 종류만 담는다 — 값은 성급·강화 레벨로 정해지므로(엔진의 표) 여기에
+        # 적어 두면 둘이 어긋날 수 있다. 화면은 registries의 artifactMainStat에서 읽는다.
+        "main":   {"stat": art.main_stat_type.name},
+        "subs":   [{"stat": s.stat_type.name, "value": s.value} for s in art.sub_stats],
     }
 
 
 def char_from_spec(spec: dict):
     """빌드시트 한 명분으로 새 Character를 만든다.
 
-    검증은 엔진이 이미 갖고 있다 — 슬롯별 허용 주옵션, 부옵션 4개·중복 금지
+    검증은 엔진이 이미 갖고 있다 — 슬롯별 허용 주옵션, 부옵션 최대 4개·중복 금지
     (core/artifact.py), 무기 종류 (core/character.py). 여기서는 ValueError를
     그대로 올려 보내고 run_calculation이 필드 에러로 바꾼다."""
     # make_character는 미등록 이름을 DefaultCharacter로 폴백한다(커스텀 캐릭터용 경로).
@@ -269,13 +308,34 @@ def char_from_spec(spec: dict):
 
 
 def _artifact_from_spec(slot_key: str, spec: dict):
+    aset   = ArtifactSet[spec["set"]]
+    stat   = StatType[spec["main"]["stat"]]
+    # 성급이 없는 빌드 JSON(성급을 고를 수 없던 시절)은 그 세트의 최고 성급으로 읽는다 —
+    # 그때는 5성 성유물만 상정하고 있었고, 3~4성 세트는 4성이 그 자리다.
+    rarity = (int(spec["rarity"]) if spec.get("rarity") is not None
+              else max(artifact_class(aset).RARITIES))
     return make_artifact(
-        artifact_set = ArtifactSet[spec["set"]],
-        slot         = ArtifactSlot[slot_key.upper()],
-        main_stat    = MainStat(StatType[spec["main"]["stat"]], float(spec["main"]["value"])),
-        sub_stats    = [SubStat(StatType[s["stat"]], float(s["value"]))
-                        for s in spec.get("subs") or []],
+        artifact_set   = aset,
+        slot           = ArtifactSlot[slot_key.upper()],
+        rarity         = rarity,
+        level          = _artifact_level(spec, stat, rarity),
+        main_stat_type = stat,
+        sub_stats      = [SubStat(StatType[s["stat"]], float(s["value"]))
+                          for s in spec.get("subs") or []],
     )
+
+
+def _artifact_level(spec: dict, stat: StatType, rarity: int) -> int | None:
+    """강화 레벨. 주옵션 값을 직접 적던 시절의 빌드 JSON은 레벨을 갖고 있지 않다.
+
+    그런 빌드는 **적어 둔 주옵션 값으로 레벨을 되찾는다** — 그러지 않고 만강화로
+    떨어뜨리면 +16짜리 성배가 조용히 +20이 되어 숫자가 오른다. 값이 표에 없으면
+    ValueError가 그대로 올라가고 UI가 어느 슬롯인지 알려 준다.
+    (무기 티어를 화면 값으로 되찾는 weapon_scaling.tier_from_substat과 같은 사정이다.)"""
+    if spec.get("level") is not None:
+        return int(spec["level"])
+    value = (spec.get("main") or {}).get("value")
+    return None if value is None else artifact_scaling.level_from_value(stat, rarity, float(value))
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -293,7 +353,9 @@ def _artifact_from_spec(slot_key: str, spec: dict):
 # (호출 지점, 같은 지점 반복 횟수)라 파티 구성과 엔진 소스 줄 번호에 묶여 있어
 # 밖으로 들고 나갈 수 없다. 빌드만 오간다.
 BUILD_FORMAT  = "gidc.build"
-BUILD_VERSION = 1
+# v2: 성유물이 성급·강화 레벨을 갖고 주옵션 값을 갖지 않는다. v1(주옵션 값을 직접
+# 적던 형식)도 그대로 읽힌다 — _artifact_level이 그 값으로 강화 레벨을 되찾는다.
+BUILD_VERSION = 2
 
 
 def export_build(spec) -> str:

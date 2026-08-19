@@ -10,6 +10,8 @@ class VermillionHereafter(Artifact):
     「숨겨진 빛」 효과는 캐릭터 퇴장 시 사라진다. 지속 시간 동안 다시 원소폭발 발동 시 기존의 「숨겨진 빛」이 사라진다
     """
 
+    RARITIES = (4, 5)
+
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
             hit.add("atk_pct", 0.18, (self.artifact_set, 2))

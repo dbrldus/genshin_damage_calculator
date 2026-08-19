@@ -13,6 +13,8 @@ class UnfinishedReverie(Artifact):
     연소 상태의 적이 있을 시, 50%에 이를 때까지 초당 10%씩 증가한다. 해당 성유물 세트를 장착한 캐릭터가 대기 상태 시에도 해당 효과는 발동된다
     """
 
+    RARITIES = (4, 5)
+
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
             hit.add("atk_pct", 0.18, (self.artifact_set, 2))

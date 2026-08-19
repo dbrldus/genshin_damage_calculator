@@ -7,6 +7,8 @@ class DefendersWill(Artifact):
     4세트: 파티 내에 다른 원소 타입의 자신의 캐릭터가 1명 존재할 때마다 자신은 대응하는 원소의 내성을 30% 획득한다
     """
 
+    RARITIES = (3, 4)
+
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
             hit.add("def_pct", 0.30, (self.artifact_set, 2))

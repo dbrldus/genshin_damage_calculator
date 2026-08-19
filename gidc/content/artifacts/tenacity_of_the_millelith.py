@@ -9,6 +9,8 @@ class TenacityOfTheMillelith(Artifact):
     해당 효과는 0.5초마다 최대 1회 발동되며, 해당 성유물을 장착 한 캐릭터가 대기 상태 일 때도 발동된다
     """
 
+    RARITIES = (4, 5)
+
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
             hit.add("hp_pct", 0.20, (self.artifact_set, 2))

@@ -7,6 +7,8 @@ class TheExile(Artifact):
     4세트: 원소폭발 발동 후 2초마다 파티 내 모든 캐릭터(자신을 포함하지 않음)의 원소 에너지를 2pt 회복한다. 해당 효과는 6초간 지속하며 중첩되지 않는다
     """
 
+    RARITIES = (3, 4)
+
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
             hit.add("energy_recharge", 0.20, (self.artifact_set, 2))

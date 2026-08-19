@@ -8,6 +8,8 @@ class BraveHeart(Artifact):
     4세트: HP가 50%를 초과하는 적에게 주는 피해가 30% 증가한다
     """
 
+    RARITIES = (3, 4)
+
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
             hit.add("atk_pct", 0.18, (self.artifact_set, 2))

@@ -9,6 +9,8 @@ class DesertPavilionChronicle(Artifact):
     일반 공격, 강공격, 낙하 공격으로 주는 피해가 40% 증가한다. 지속 시간: 15초
     """
 
+    RARITIES = (4, 5)
+
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
             hit.add("anemo_dmg_bonus", 0.15, (self.artifact_set, 2))

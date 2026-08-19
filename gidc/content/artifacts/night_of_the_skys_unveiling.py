@@ -20,6 +20,8 @@ class NightOfTheSkysUnveiling(Artifact):
     「월광」으로 생성된 효과는 중첩되지 않는다
     """
 
+    RARITIES = (4, 5)
+
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
             hit.add("elemental_mastery", 80, (self.artifact_set, 2))

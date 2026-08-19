@@ -7,6 +7,8 @@ class TravelingDoctor(Artifact):
     4세트: 원소폭발 발동 시 HP를 20% 회복한다
     """
 
+    RARITIES = (1, 2, 3)
+
     def apply_2set(self, profiles, wearer) -> None:
         pass
 

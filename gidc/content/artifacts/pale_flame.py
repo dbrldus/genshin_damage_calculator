@@ -9,6 +9,8 @@ class PaleFlame(Artifact):
     해당 효과는 0.3초마다 1회 발동되며, 2회 중첩 시 2세트의 효과가 100% 증가한다
     """
 
+    RARITIES = (4, 5)
+
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
             hit.add("physical_dmg_bonus", 0.25, (self.artifact_set, 2))
