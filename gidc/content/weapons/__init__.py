@@ -12,8 +12,8 @@ from .polearm import (
     FracturedHalo, SymphonistOfScents, SkywardSpine,
 )
 from .catalyst import (
-    StarcallersWatch, FavoniusCodex, SacrificialFragments,
-    ThrillingTalesOfDragonSlayers,
+    StarcallersWatch, CranesEchoingCall, FavoniusCodex, SacrificialFragments,
+    ThrillingTalesOfDragonSlayers, 
 )
 
 WEAPON_REGISTRY: dict[str, type[Weapon]] = {
@@ -32,6 +32,7 @@ WEAPON_REGISTRY: dict[str, type[Weapon]] = {
     "맛의 지휘자":          SymphonistOfScents,
     "천공의 마루":          SkywardSpine,
     "별지기의 시선":        StarcallersWatch,
+    "학의 여음":           CranesEchoingCall,
     "페보니우스 비전":      FavoniusCodex,
     "제례의 악장":          SacrificialFragments,
     "드래곤 슬레이어 영웅담": ThrillingTalesOfDragonSlayers,

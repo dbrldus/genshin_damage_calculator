@@ -1,4 +1,5 @@
 from .rarity_5.starcallers_watch import StarcallersWatch
+from .rarity_5.cranes_echoing_call import CranesEchoingCall
 from .rarity_4.favonius_codex import FavoniusCodex
 from .rarity_4.sacrificial_fragments import SacrificialFragments
 from .rarity_3.thrilling_tales_of_dragon_slayers import ThrillingTalesOfDragonSlayers
