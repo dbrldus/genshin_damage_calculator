@@ -5,3 +5,4 @@ from .rarity_5.gest_of_the_mighty_wolf import GestOfTheMightyWolf
 from .rarity_5.fang_of_the_mountain_king import FangOfTheMountainKing
 from .rarity_5.beacon_of_the_reed_sea import BeaconOfTheReedSea
 from .rarity_5.redhorn_stonethresher import RedhornStonethresher
+from .rarity_5.song_of_broken_pines import SongOfBrokenPines
