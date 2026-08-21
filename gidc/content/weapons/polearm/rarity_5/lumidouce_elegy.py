@@ -45,8 +45,11 @@ class LumidouceElegy(Weapon):
         # 게다가 바람 캐릭터가 확산시킨 불도 연소를 일으키므로 착용자 원소로도 막을 수 없다.
         # 달감전처럼 「이 파티에서 가능한가」를 답해 주는 함수가 없는 자리다
         # (transformative_candidates의 aura는 다른 파티원의 원소일 뿐 적 부착을 모른다).
-        stacks = ask_int(f"[등방울꽃의 애가] 「하얀 새벽의 서곡」 스택 수 (최대 {self._MAX_STACKS})",
-                         0, self._MAX_STACKS)
+        stacks = ask_int(
+            "[등방울꽃의 애가] 「하얀 새벽의 서곡」 스택 수 "
+            f"(연소 반응 발동 또는 연소 상태의 적에게 풀 원소 피해, 최대 {self._MAX_STACKS})",
+            0, self._MAX_STACKS,
+        )
         if not stacks:
             return
 
