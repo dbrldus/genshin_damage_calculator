@@ -197,7 +197,10 @@ def render(spec: dict, tier: int) -> str:
     const_lines = []
     width = max((len(n) for n in spec["수치"]), default=0)
     for name, (nums, _raw, pct) in spec["수치"].items():
-        vals = ", ".join(f"{n/100:.2f}" if pct else f"{n:g}" for n in nums)
+        # 소수 자리를 고정하지 않는다 — `.2f`로 자르면 7.5%가 0.07로 **조용히 틀린다**
+        # (7.5/9/10.5/12/15.5 꼴의 무기가 실제로 있다). 반올림 오차가 남지 않게
+        # 유효숫자로 찍고, 검사 출력과 생성된 상수가 같은 수를 말하게 둔다.
+        vals = ", ".join(f"{round(n / 100, 6):g}" if pct else f"{n:g}" for n in nums)
         const_lines.append(f"    _{name:<{width}} = [{vals}]")
     consts = "\n".join(const_lines) or "    # (정련 스케일 값 없음)"
 
