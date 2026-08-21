@@ -29,6 +29,7 @@ from .polearm import (
     CrimsonMoonsSemblance,
     StaffOfTheScarletSands,
     CalamityQueller,
+    EngulfingLightning,
 )
 from .catalyst import (
     StarcallersWatch, CranesEchoingCall, FavoniusCodex, SacrificialFragments,
@@ -91,6 +92,7 @@ WEAPON_REGISTRY: dict[str, type[Weapon]] = {
     "참봉의 칼날":           SummitShaper,
     "적색 사막의 지팡이":       StaffOfTheScarletSands,
     "식재":               CalamityQueller,
+    "예초의 번개":           EngulfingLightning,
 }
 
 
