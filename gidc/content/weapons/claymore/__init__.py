@@ -8,3 +8,4 @@ from .rarity_5.redhorn_stonethresher import RedhornStonethresher
 from .rarity_5.song_of_broken_pines import SongOfBrokenPines
 from .rarity_5.the_unforged import TheUnforged
 from .rarity_5.wolfs_gravestone import WolfsGravestone
+from .rarity_5.skyward_pride import SkywardPride

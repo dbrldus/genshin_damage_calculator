@@ -2,7 +2,7 @@ from gidc.enums import WeaponType
 from gidc.core.weapon import Weapon, WeaponSubStat
 
 from ._default import DefaultWeapon
-from .claymore import AThousandBlazingSuns, Verdict, ATeaspoonOfTranscendence, GestOfTheMightyWolf, FangOfTheMountainKing, BeaconOfTheReedSea, RedhornStonethresher, SongOfBrokenPines, TheUnforged, WolfsGravestone
+from .claymore import AThousandBlazingSuns, Verdict, ATeaspoonOfTranscendence, GestOfTheMightyWolf, FangOfTheMountainKing, BeaconOfTheReedSea, RedhornStonethresher, SongOfBrokenPines, TheUnforged, WolfsGravestone, SkywardPride
 from .sword import (
     PeakPatrolSong, SkywardBlade, AquilaFavonia, Azurelight,
     FavoniusSword, CalamityOfEshu,
@@ -62,6 +62,7 @@ WEAPON_REGISTRY: dict[str, type[Weapon]] = {
     "송뢰가 울릴 무렵":        SongOfBrokenPines,
     "무공의 검":            TheUnforged,
     "늑대의 말로":           WolfsGravestone,
+    "천공의 긍지":           SkywardPride,
 }
 
 
