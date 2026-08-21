@@ -214,7 +214,7 @@ class Sucrose(Character):
             for i in picked:
                 for char in targets[swirlable[i]]:
                     for hit in all_hits[char].values():
-                        hit.add("elemental_mastery", self._A1_SWIRLED_ELEMENT_EM, self, note="A1")
+                        hit.add("em_from_flat", self._A1_SWIRLED_ELEMENT_EM, self, note="A1")
 
         # ── 뒤 단계에서 쓸 입력 ────────────────────────────────────────────
         # A4는 설탕의 최종 원소 마스터리를 읽어야 하므로 적용은 Phase 5로 넘긴다.
@@ -271,22 +271,21 @@ class Sucrose(Character):
         # 같은 단계에서 더해 줄 수 있어(이네파 A4 등), 여기서 미리 확정하면 파티 멤버 순서가
         # 결과를 바꾼다.
         #
-        # 재료는 elemental_mastery가 아니라 convertible_em()이다 — 이쪽은 원소 마스터리를
+        # 재료는 elemental_mastery(합계)가 아니라 em_from_flat이다 — 이쪽은 원소 마스터리를
         # **다시 원소 마스터리로 변환**하는 효과라, 남에게서 %로 받은 지분까지 재료로 쓰면
         # 설탕 둘이 서로를 부풀리는 고리가 된다. 원소 마스터리에 비례한 몫을 피해에 직접
-        # 더하는 효과(시틀라리 A4/C1)만 elemental_mastery를 그대로 읽는다.
+        # 더하는 효과(시틀라리 A4/C1)만 합계 elemental_mastery를 읽는다.
         #
-        # 받는 쪽에는 elemental_mastery와 em_from_pct_share에 **동시에** 태그한다. 본인
-        # 반응에는 그대로 들어가되 다음 %-변환(카즈하의 EM→원소 피해 등)의 재료로는 쓰이지
-        # 않게 하는 꼬리표다(profile.convertible_em).
+        # 받는 쪽은 em_from_pct_share **한 곳**에만 넣는다. 합계(elemental_mastery)는
+        # 두 조각의 합이라 본인 반응에는 자동으로 들어가고, 다음 %-변환(카즈하의 EM→원소
+        # 피해 등)이 읽는 em_from_flat에는 애초에 안 쌓인다.
         source_hit = next(iter(all_hits[self].values()))
-        share = lambda: source_hit.convertible_em() * self._A4_EM_SHARE
+        share = lambda: source_hit.em_from_flat * self._A4_EM_SHARE
 
         for char, char_hits in all_hits.items():
             if char is self:      # 「설탕 자신을 포함하지 않음」
                 continue
             for hit in char_hits.values():
-                hit.add("elemental_mastery", share, self, note="A4")
                 hit.add("em_from_pct_share", share, self, note="A4")
 
     # ── 의도적 미구현 ─────────────────────────────────────────────────────

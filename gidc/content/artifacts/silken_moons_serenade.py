@@ -47,7 +47,7 @@ class SilkenMoonsSerenade(Artifact):
         # 다른 세트가 부여하는 「월광」은 자기 키로 각자 자기 몫을 더한다.
         for char_hits in all_hits.values():
             for hit in char_hits.values():
-                hit.apply_unique_buff(source, "elemental_mastery",       mastery)
+                hit.apply_unique_buff(source, "em_from_flat",       mastery)
                 hit.apply_unique_buff(source, "lunar_charged_bonus",     0.1)
                 hit.apply_unique_buff(source, "lunar_bloom_bonus",       0.1)
                 hit.apply_unique_buff(source, "lunar_crystallize_bonus", 0.1)

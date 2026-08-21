@@ -16,7 +16,7 @@ class AubadeOfMorningstarAndMoon(Artifact):
 
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
-            hit.add("elemental_mastery", 80, (self.artifact_set, 2))
+            hit.add("em_from_flat", 80, (self.artifact_set, 2))
 
     def apply_4set(self, all_hits, wearer) -> None:
         off_field = ask_bool("[샛별과 달의 여명 4세트] 대기 상태?")

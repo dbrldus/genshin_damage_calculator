@@ -195,11 +195,11 @@ def _apply_elemental_resonance(
     # 원소 마스터리 +50 (고정)
     # 연소·활성·개화 반응 후 전원 EM +30 (6s), 촉진·발산·만개·발화 반응 후 전원 EM +20 (6s)
     if elem_counts[Element.DENDRO] >= 2:
-        _all(lambda h: h.add("elemental_mastery", 50, "원소 공명: 만생의 풀"))
+        _all(lambda h: h.add("em_from_flat", 50, "원소 공명: 만생의 풀"))
         if ask_bool("[원소 공명: 만생의 풀] 연소·활성·개화 반응 후 EM +30 활성 여부"):
-            _all(lambda h: h.add("elemental_mastery", 30, "원소 공명: 만생의 풀", note="연소/활성/개화"))
+            _all(lambda h: h.add("em_from_flat", 30, "원소 공명: 만생의 풀", note="연소/활성/개화"))
         if ask_bool("[원소 공명: 만생의 풀] 촉진·발산·만개·발화 반응 후 EM +20 활성 여부"):
-            _all(lambda h: h.add("elemental_mastery", 20, "원소 공명: 만생의 풀", note="촉진/발산/만개/발화"))
+            _all(lambda h: h.add("em_from_flat", 20, "원소 공명: 만생의 풀", note="촉진/발산/만개/발화"))
 
     # ── 부동의 바위 (바위 2명) ────────────────────────────────────────────
     # 보호막 강화 +15% (피해 스탯 없음), 보호막 보유 시: 피해 +15% + 적 바위 내성 -20%
@@ -247,7 +247,7 @@ def _full_moon_buffer_bonus(hit: SkillHit, element: Element) -> float:
         return (hit.current_def() / 100.0) * 0.01      # 방어력 100pt당 1%
     if element in (Element.ANEMO, Element.DENDRO):
         # EM→피해 변환이므로 꼬리표 달린 지분(설탕 등)은 재료에서 제외한다.
-        return (hit.convertible_em() / 100.0) * 0.0225  # 원소 마스터리 100pt당 2.25%
+        return (hit.em_from_flat / 100.0) * 0.0225  # 원소 마스터리 100pt당 2.25%
     return 0.0
 
 

@@ -236,7 +236,7 @@ class Citlali(Character):
         # contribute_dependent_stats(Phase 4)로 나뉘어 있다.
         if self.constellation >= 2:
             for hit in hits.values():
-                hit.add("elemental_mastery", self._C2_SELF_EM, self, note="C2")
+                hit.add("em_from_flat", self._C2_SELF_EM, self, note="C2")
 
     # ── 파티 버프 4: 코어 스탯 기여 + 유저 입력 수집 ─────────────────────────
     def contribute_dependent_stats(self, all_hits: dict["Character", dict[str, SkillHit]]) -> None:
@@ -269,7 +269,7 @@ class Citlali(Character):
                 if char is self:
                     continue
                 for hit in char_hits.values():
-                    hit.add("elemental_mastery", self._C2_ALLY_EM, self, note="C2")
+                    hit.add("em_from_flat", self._C2_ALLY_EM, self, note="C2")
 
     # ── 파티 버프 4.5: 스탯을 읽지 않는 크로스 버프 ─────────────────────────
     def apply_party_buffs(self, all_hits: dict["Character", dict[str, SkillHit]]) -> None:
@@ -310,7 +310,7 @@ class Citlali(Character):
         # 미리 확정하면 누가 먼저 실행되느냐가 결과를 바꾼다. 함수로 넘기면 이 필드를
         # 읽는 순간 그때까지의 모든 기여가 확정된 뒤 계산된다.
         #
-        # convertible_em()이 아니라 elemental_mastery를 **그대로** 읽는 이유:
+        # em_from_flat이 아니라 elemental_mastery를 **그대로** 읽는 이유:
         # A4와 C1은 원마를 다시 원마나 피해 보너스(%)로 변환하는 효과가 아니라, 원마에
         # 비례한 몫을 피해에 직접 더하는 효과다. 재변환이 없으니 무한 루프도 없고,
         # 시틀라리가 실제로 들고 있는 원마는 출처와 무관하게 전부 재료가 된다

@@ -16,7 +16,7 @@ class GildedDreams(Artifact):
 
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
-            hit.add("elemental_mastery", 80, (self.artifact_set, 2))
+            hit.add("em_from_flat", 80, (self.artifact_set, 2))
 
     def apply_4set(self, all_hits, wearer) -> None:
         # 대기 상태에서도 발동하므로 필드 등장 여부는 묻지 않는다.
@@ -39,7 +39,7 @@ class GildedDreams(Artifact):
 
         for hit in all_hits[wearer].values():
             hit.add("atk_pct", same * 0.14, (self.artifact_set, 4))
-            hit.add("elemental_mastery", diff * 50, (self.artifact_set, 4))
+            hit.add("em_from_flat", diff * 50, (self.artifact_set, 4))
 
     def apply_4set_dependent(self, all_hits, wearer):
         pass

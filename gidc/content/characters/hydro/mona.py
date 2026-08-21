@@ -261,7 +261,7 @@ class Mona(Character):
                 and ask_bool("[모나 C2] 강공격 명중 후 원소 마스터리 증가 유지 여부")):
             for char_hits in all_hits.values():
                 for hit in char_hits.values():
-                    hit.add("elemental_mastery", self._C2_HEXEREI_EM, self, note="C2 마도 강화")
+                    hit.add("em_from_flat", self._C2_HEXEREI_EM, self, note="C2 마도 강화")
 
     def _ask_on_field_member(self, all_hits):
         """C1 마도 강화 분기에서 '대기 상태'를 가려내기 위한 현재 필드 위 캐릭터.

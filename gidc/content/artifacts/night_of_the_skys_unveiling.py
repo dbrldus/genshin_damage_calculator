@@ -24,7 +24,7 @@ class NightOfTheSkysUnveiling(Artifact):
 
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
-            hit.add("elemental_mastery", 80, (self.artifact_set, 2))
+            hit.add("em_from_flat", 80, (self.artifact_set, 2))
 
     def apply_4set(self, all_hits, wearer) -> None:
         # 「월광·음모」는 달빛 반응 발동 + 장착 캐릭터가 필드 위일 때만 획득한다.

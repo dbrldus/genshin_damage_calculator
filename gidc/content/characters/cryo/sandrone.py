@@ -430,11 +430,11 @@ class Sandrone(Character):
 
         # A4 숙녀의 에티켓: 자기 공격력으로 자기 원소 마스터리를 올린다.
         # **상시**다 — 원문에 섬광·별빛 조건이 없다(유저 확인). 파티도 로테이션도 안 본다.
-        # 공격력에서 파생된 EM이므로 em_from_pct_share에 함께 태그해, EM을 **다시 %로 변환**
-        # 하는 버프(카즈하류)가 이 지분을 재료로 쓰지 못하게 막는다.
+        # 공격력에서 파생된 EM이므로 em_from_flat이 아니라 em_from_pct_share에 넣는다 —
+        # EM을 **다시 %로 변환**하는 버프(카즈하류)가 이 지분을 재료로 쓰지 못하게 막는다.
+        # 합계(elemental_mastery)는 두 조각의 합이라 본인 반응에는 그대로 들어간다.
         em = lambda: min(atk_per_100() * self._A4_EM_PER_100_ATK, self._A4_EM_CAP)
         for hit in all_hits[self].values():
-            hit.add("elemental_mastery", em, self, note="A4 숙녀의 에티켓")
             hit.add("em_from_pct_share", em, self, note="A4 숙녀의 에티켓")
 
     # ── 의도적 미구현 ─────────────────────────────────────────────────────

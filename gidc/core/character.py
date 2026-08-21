@@ -286,7 +286,7 @@ class Character(ABC):
 
         ATK/DEF/HP 코어 풀에 **즉시 값으로** 되먹이면 무한 루프이며 정확성 가드가 실패시킨다.
         EM을 **다시 %로 변환**하는 버프(EM→EM, EM→피해 보너스 %; 카즈하)는 elemental_mastery
-        대신 convertible_em()을 읽어 꼬리표 달린 지분을 재료에서 뺀다. 반대로 EM에 비례한
+        대신 em_from_flat을 읽어 꼬리표 달린 지분을 재료에서 뺀다. 반대로 EM에 비례한
         몫을 피해에 직접 더하는 버프(시틀라리 A4/C1)는 재변환이 아니므로 elemental_mastery를
         그대로 읽는다 — 실제로 들고 있는 EM은 출처와 무관하게 전부 재료가 된다."""
         ...

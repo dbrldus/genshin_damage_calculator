@@ -30,7 +30,7 @@ def is_recording() -> bool:
 # 그 필드를 실제로 읽는 순간 계산한다(지연 평가). 등록 순서·파티 멤버 순서와 무관하게
 # 같은 결과가 나오고, 사슬이 몇 단이든 필요한 만큼 재귀로 풀린다.
 #
-#     hit.add("elemental_mastery", lambda: ineffa_hit.current_atk() * 0.06, self)
+#     hit.add("em_from_pct_share", lambda: ineffa_hit.current_atk() * 0.06, self)
 #     hit.add("flat_dmg_bonus",    lambda: citlali_hit.elemental_mastery * 12, self)
 #
 # 순환(A가 B를 읽고 B가 A를 읽는 구조)은 값이 정해지지 않으므로 즉시 실패시킨다.
@@ -142,16 +142,31 @@ class SkillHit:
     # 최종 공격력에는 그대로 들어가지만(current_atk), 공격력을 읽어 **다시 공격력을 만드는**
     # 버프의 재료에서는 빠진다(convertible_atk). 얀사 운동량 측정기가 자기 자신을 필드 위
     # 캐릭터로 삼는 경우가 이쪽이다 — 같은 슬롯을 읽고 쓰면 값이 정해지지 않기 때문이다.
-    # em_from_pct_share와 같은 계열이되, 뺄셈이 아니라 **별도 필드**여야 한다: 재료 쪽이
-    # atk_flat을 읽는 순간 자기 몫의 미결 지연 기여가 확정을 요구해 다시 순환이 된다.
+    # 뺄셈이 아니라 **별도 필드**여야 한다: 재료 쪽이 atk_flat을 읽는 순간 자기 몫의
+    # 미결 지연 기여가 확정을 요구해 다시 순환이 된다. EM 쪽(em_from_flat /
+    # em_from_pct_share)도 같은 이유로 같은 모양이다.
     atk_flat_derived: float = 0.0
     #endregion
 
     # ── 전투 스탯 ────────────────────────────────────────────────────────────
     #region
-    elemental_mastery: float = 0.0
-    # '다른 캐릭터 스탯의 %'로 받은 EM 지분 (무한 루프 방지 꼬리표).
-    # 본인 반응엔 반영되나(elemental_mastery에 포함), 다른 %-변환의 재료로는 쓸 수 없다.
+    # 원소 마스터리는 **유래별로 두 조각에 저장**하고 합계(elemental_mastery)는 파생시킨다.
+    # 나누는 기준은 「무엇에서 왔는가」다 — 값의 단위가 아니다(게임에 원소 마스터리 %
+    # 옵션이 없어 둘 다 실수치다).
+    #
+    #   em_from_flat      고정 수치로 부여된 EM. 장비·돌파·원소 공명·고정 버프.
+    #   em_from_pct_share 다른 스탯의 %에서 파생된 EM 지분. 설탕 A4(EM%), 이네파·산드로네
+    #                     A4(ATK%), 콜롬비나 C2·성현의 열쇠(HP%).
+    #
+    # 나누는 이유는 둘이다.
+    #  1) 무한 루프 방지 — %-변환 버프(EM→EM, EM→피해%, EM→ATK)는 em_from_flat만 재료로
+    #     읽는다. 파생 지분까지 재료로 쓰면 설탕 둘이 서로를 부풀리는 고리가 된다.
+    #  2) 순환 오탐 방지 — 합계에서 지분을 빼는 방식이었을 때는 재료 쪽이 합계 필드를
+    #     읽어야 했고, 그 읽기가 지분의 미결 지연 기여를 확정시켜 **값으로는 정확히
+    #     상쇄되는** 관계까지 CyclicBuffError로 잡혔다(이네파 A4 + 적색 사막의 지팡이).
+    #     조각을 나누면 재료 쪽이 지분 필드를 아예 건드리지 않아 간선 자체가 없다.
+    # atk_flat / atk_flat_derived가 같은 이유로 이미 같은 모양이다.
+    em_from_flat: float = 0.0
     em_from_pct_share: float = 0.0
     energy_recharge:   float = 1.0
     crit_rate:         float = 0.05
@@ -339,10 +354,22 @@ class SkillHit:
     def current_atk(self) -> float: return self.atk_base * (1.0 + self.atk_pct) + self.atk_flat + self.atk_flat_derived
     def current_def(self) -> float: return self.def_base * (1.0 + self.def_pct) + self.def_flat
 
-    def convertible_em(self) -> float:
-        # %-변환 버프(EM→피해 / EM→EM)가 읽어야 하는 EM. 꼬리표 달린 지분은 제외한다.
-        # (예: 설탕이 준 EM은 카즈하의 EM→원소피해 변환 계산에 들어가지 않는다.)
-        return self.elemental_mastery - self.em_from_pct_share
+    @property
+    def elemental_mastery(self) -> float:
+        """캐릭터가 실제로 들고 있는 원소 마스터리 — 저장 조각 둘의 합.
+
+        반응 계산·EM 스케일 히트·「EM의 N%를 피해에 직접 더하는」 버프가 읽는 값이다.
+
+        **세터가 없다.** add("elemental_mastery", ...)는 AttributeError로 죽는다 — 새 기여는
+        고정 수치면 em_from_flat, 다른 스탯의 %에서 파생됐으면 em_from_pct_share로
+        **골라서** 넣어야 한다. 고르지 않고 합계에 넣을 수 있으면 꼬리표 규약이 새기
+        때문에, 틀린 쪽을 조용히 허용하느니 컴파일하듯 막는다.
+
+        %-변환 버프(EM→EM·EM→피해%·EM→ATK)의 재료는 이 합계가 아니라 em_from_flat이다.
+        반대로 EM에 비례한 몫을 **피해에 직접 더하는** 효과(시틀라리 A4/C1, 잎을 가르는
+        빛)는 재변환이 아니므로 이 합계를 그대로 읽는다.
+        """
+        return self.em_from_flat + self.em_from_pct_share
 
     def convertible_atk(self) -> float:
         """**공격력 → 공격력** 변환 버프만 읽는 공격력. 파생 지분(atk_flat_derived)은 뺀다.
@@ -354,7 +381,7 @@ class SkillHit:
 
         공격력을 읽어 **다른** 필드에 쓰는 버프(마비카·한운·제사의 여운 등)는 순환이 아니므로
         current_atk()를 그대로 읽는다 — 실제로 들고 있는 공격력은 출처와 무관하게 전부 재료다.
-        convertible_em()이 %-재변환만 막고 EM→피해는 막지 않는 것과 같은 규약이다.
+        em_from_flat이 %-재변환만 막고 EM→피해는 막지 않는 것과 같은 규약이다.
 
         변환기가 둘 이상이면 서로의 파생 지분을 못 본다. 게임은 순서대로라면 뒤쪽이 앞쪽을
         볼 테니 근사이지만, 순서 독립성을 지키려면 이쪽이 맞다(em_from_pct_share와 같은 교환).
@@ -606,7 +633,8 @@ _STAT_FIELD: dict[StatType, str] = {
     StatType.HP_PCT:            "hp_pct",
     StatType.ATK_PCT:           "atk_pct",
     StatType.DEF_PCT:           "def_pct",
-    StatType.ELEMENTAL_MASTERY: "elemental_mastery",
+    # 장비·돌파가 주는 실수치 EM은 전부 '변환 재료가 되는' 쪽이다.
+    StatType.ELEMENTAL_MASTERY: "em_from_flat",
     StatType.ENERGY_RECHARGE:   "energy_recharge",
     StatType.CRIT_RATE:         "crit_rate",
     StatType.CRIT_DMG:          "crit_dmg",
@@ -854,6 +882,19 @@ def _validate_pair(reaction_type: ReactionType, dmg_type: DmgType) -> None:
         )
 
 
+# 원소 마스터리의 **원장 필드** — 합계 elemental_mastery는 파생 프로퍼티라 기여가 기록되지
+# 않는다. 설명 화면이 「이 피해가 실제로 읽는 필드」를 셀 때는 저장 조각 둘을 넣어야 한다.
+_EM_LEDGER_FIELDS = frozenset({"em_from_flat", "em_from_pct_share"})
+
+
+def _add_stat_field(fields: set[str], attr: str) -> None:
+    """설명용 필드 집합에 스탯 하나를 넣는다. 파생 스탯은 원장 필드로 펼친다."""
+    if attr == "elemental_mastery":
+        fields |= _EM_LEDGER_FIELDS
+    else:
+        fields.add(attr)
+
+
 # ScalingStat → 히트에서 읽을 최종 스탯 필드명
 _SCALING_STAT_ATTR: dict[ScalingStat, str] = {
     ScalingStat.ATK: "atk_final",
@@ -1066,7 +1107,7 @@ def lunar_reaction_input_fields(
     # 계수·스탯·coeff_amp·%피해 보너스·flat_dmg_bonus·방어력 필드는 일부러 없다.
     fields = {
         element_res_reduction_field(element),
-        "elemental_mastery",
+        *_EM_LEDGER_FIELDS,
         "elevation_multiplier",
         # 격변과 달리 캐릭터 치명타를 쓴다.
         "crit_rate", "crit_dmg",
@@ -1155,7 +1196,7 @@ def stellar_reaction_input_fields(
     """
     fields = {
         element_res_reduction_field(element),
-        "elemental_mastery",
+        *_EM_LEDGER_FIELDS,
         "elevation_multiplier",
         "crit_rate", "crit_dmg",
         # 반응 배율의 재료. 별 초전도는 반응 피해가 없으므로 기록 히트 수는 여기 없다.
@@ -1196,7 +1237,7 @@ def transformative_input_fields(
     """
     # 계수·스탯·coeff_amp·%피해 보너스·flat_dmg_bonus·방어력 필드는 일부러 없다.
     # _calc_transformative가 하나도 읽지 않는다(위 함수가 0으로 못박은 자리들).
-    fields = {element_res_reduction_field(element), "elemental_mastery"}
+    fields = {element_res_reduction_field(element), *_EM_LEDGER_FIELDS}
 
     bonus = reaction_bonus_field(reaction)
     if bonus:
@@ -1264,13 +1305,13 @@ def damage_input_fields(
         if hit.stat_fn is not None:
             # 임의의 함수라 어떤 스탯을 읽는지 알 수 없다 → 전부 후보로 남긴다.
             prefixes = ("hp", "atk", "def")
-            fields.add("elemental_mastery")
+            fields |= _EM_LEDGER_FIELDS
         else:
             attr = _SCALING_STAT_ATTR[hit.scaling_stat]
             # atk_final 같은 파생값은 base/pct/flat 세 조각에서 나온다.
             prefixes = (attr.removesuffix("_final"),) if attr.endswith("_final") else ()
             if not prefixes:
-                fields.add(attr)                    # 원소 마스터리 스케일
+                _add_stat_field(fields, attr)       # 원소 마스터리 스케일
         for prefix in prefixes:
             fields |= {f"{prefix}_base", f"{prefix}_pct", f"{prefix}_flat"}
 
@@ -1281,7 +1322,7 @@ def damage_input_fields(
                 fields.add(field)
 
     if reaction_type is not ReactionType.NONE:
-        fields.add("elemental_mastery")
+        fields |= _EM_LEDGER_FIELDS
         bonus = reaction_bonus_field(reaction_type)
         if bonus:
             fields.add(bonus)

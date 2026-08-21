@@ -39,7 +39,7 @@ class StarcallersWatch(Weapon):
 
         # 효과 1: 착용자 원소 마스터리 — 부옵션과 별개로 더해지는 무조건 상승분.
         for hit in all_hits[wearer].values():
-            hit.add("elemental_mastery", self._EM_BONUS[r], self._SOURCE,
+            hit.add("em_from_flat", self._EM_BONUS[r], self._SOURCE,
                     note="연기 제사")
 
         # 효과 2: 「주시」 — 착용자가 보호막을 창조했을 때만 켜진다.

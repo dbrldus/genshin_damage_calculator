@@ -51,4 +51,4 @@ class NewYearsMorningHibernation(Weapon):
                 # 꼬리표 없는 평범한 원소 마스터리다. em_from_pct_share는 「EM을 %로 나눠
                 # 받은 지분」에만 붙는 것이고(설탕·나히다), 무기가 주는 실수치 EM은 카즈하
                 # 같은 EM→% 변환의 재료가 되는 게 맞다.
-                hit.add("elemental_mastery", amount, label, note=note)
+                hit.add("em_from_flat", amount, label, note=note)

@@ -12,7 +12,7 @@ class WanderersTroupe(Artifact):
 
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
-            hit.add("elemental_mastery", 80, (self.artifact_set, 2))
+            hit.add("em_from_flat", 80, (self.artifact_set, 2))
 
     def apply_4set(self, all_hits, wearer) -> None:
         if wearer.weapon_type == WeaponType.CATALYST or wearer.weapon_type == WeaponType.BOW:

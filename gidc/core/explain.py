@@ -66,7 +66,8 @@ _DMG_POOL_FIELDS = [
 _DECLARED_FIELDS = ["coeff", "coeff_amp"]
 
 _CRIT_REACTION_FIELDS = [
-    "crit_rate", "crit_dmg", "elemental_mastery", "energy_recharge",
+    # EM은 합계가 파생 프로퍼티라 원장이 없다 — 저장 조각 둘을 넣는다(profile._EM_LEDGER_FIELDS).
+    "crit_rate", "crit_dmg", "em_from_flat", "em_from_pct_share", "energy_recharge",
     "def_reduction", "def_ignore", "elevation_multiplier",
     # 별 반응 계수의 재료. 계수를 바꾸는 값이라 「이 숫자가 왜 그런지」에 답하려면 보여야 한다.
     "stellar_recorded_hits", "stellar_gust_level",

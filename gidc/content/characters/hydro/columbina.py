@@ -195,9 +195,11 @@ class Columbina(Character):
     _C2_RADIANCE_HP_PCT = 0.40
     # C2 보름 : 광휘 지속 중 필드 위 캐릭터에게 콜롬비나 HP 최대치 기반 스탯 부여.
     # 인력 간섭 타입별로 (대상 필드, HP 대비 비율)
+    # EM은 '다른 캐릭터 스탯의 %'로 주는 지분이라 변환 재료가 되지 않는 조각에 넣는다
+    # (합계 elemental_mastery에는 자동으로 포함된다 — profile.SkillHit 참고).
     _C2_FULLMOON_CONVERSION = (
         ("atk_flat",          0.0100),   # 달 감전 → 공격력
-        ("elemental_mastery", 0.0035),   # 달 개화 → 원소 마스터리
+        ("em_from_pct_share", 0.0035),   # 달 개화 → 원소 마스터리
         ("def_flat",          0.0100),   # 달 결정 → 방어력
     )
 
@@ -337,10 +339,9 @@ class Columbina(Character):
                 field_name, ratio = self._C2_FULLMOON_CONVERSION[self._interference]
                 value = lambda: source_hit.current_hp() * ratio
                 for hit in all_hits[self._on_field].values():
+                    # 대상 필드가 이미 '재변환 재료에서 빠지는' 조각을 가리킨다
+                    # (_C2_FULLMOON_CONVERSION) — 따로 태그할 필요가 없다.
                     hit.add(field_name, value, self, note="C2 보름 전환")
-                    # EM은 '다른 캐릭터 스탯의 %'로 준 지분이므로 재변환 재료가 되지 않게 태그한다.
-                    if field_name == "elemental_mastery":
-                        hit.add("em_from_pct_share", value, self, note="C2 보름 전환")
 
     def _ask_on_field_member(self, all_hits):
         """C2 보름 분기 대상이 될 현재 필드 위 캐릭터. 파티원이 1명뿐이면 묻지 않는다."""

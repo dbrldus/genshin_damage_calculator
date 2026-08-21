@@ -44,7 +44,7 @@ class LightOfFoliarIncision(Weapon):
     # ── 「가지치기」 — 착용자의 최종 원소 마스터리 기반 (방식 B) ──────────────
     # 「피해가 원소 마스터리의 N%만큼 증가」는 원마를 다시 %나 원마로 재변환하는 효과가
     # 아니라 원마에 비례한 몫을 피해에 직접 더하는 효과다(시틀라리 A4/C1과 같은 문구·같은
-    # 판단) — convertible_em()이 아니라 elemental_mastery를 그대로 읽고, %-보너스 풀이
+    # 판단) — em_from_flat이 아니라 elemental_mastery를 그대로 읽고, %-보너스 풀이
     # 아니라 flat_dmg_bonus로 차원 변환해 넣는다.
     def apply_passive_dependent(self, all_hits, wearer) -> None:
         if not self._pruning:

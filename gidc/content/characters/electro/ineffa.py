@@ -259,10 +259,15 @@ class Ineffa(Character):
                     )
 
         # A4 매개변수 재구성: 이네파 공격력의 6%를 원소 마스터리로 — 이네파 + 필드 위 1명.
-        # 이네파 공격력에서 파생된 EM이므로 em_from_pct_share에 함께 태그해,
-        # 카즈하처럼 EM을 **다시 %로 변환**하는 버프가 이 지분을 재료로 쓰지 못하게 막는다.
-        # (EM에 비례한 몫을 피해에 직접 더하는 쪽 — 시틀라리 A4/C1 — 은 재변환이 아니라
-        #  이 지분도 그대로 재료로 쓴다.)
+        # 이네파 공격력에서 파생된 EM이므로 em_from_flat이 아니라 em_from_pct_share에
+        # 넣는다 — 카즈하처럼 EM을 **다시 %로 변환**하는 버프가 이 지분을 재료로 쓰지
+        # 못하게 막는다. 합계(elemental_mastery)는 두 조각의 합이라 본인 반응에는 그대로
+        # 들어가고, EM에 비례한 몫을 피해에 직접 더하는 쪽(시틀라리 A4/C1)도 합계를 읽으니
+        # 이 지분을 정상적으로 재료로 쓴다.
+        #
+        # 조각을 나눠 저장하는 것이 여기서 결정적이다 — 합계에서 빼는 방식이었을 때는,
+        # 이네파가 적색 사막의 지팡이(EM→공격력)를 직접 들면 재료 쪽이 합계를 읽느라
+        # 이 기여를 확정시켜 CyclicBuffError가 났다. 값으로는 정확히 상쇄되는데도.
         if self._burst_used:
             em = lambda: source_hit.current_atk() * self._A4_EM_FROM_ATK
             targets = {id(self): self}
@@ -270,5 +275,4 @@ class Ineffa(Character):
                 targets[id(self._on_field)] = self._on_field
             for char in targets.values():
                 for hit in all_hits[char].values():
-                    hit.add("elemental_mastery", em, self, note="A4 매개변수 재구성")
                     hit.add("em_from_pct_share", em, self, note="A4 매개변수 재구성")

@@ -14,7 +14,7 @@ class FlowerOfParadiseLost(Artifact):
 
     def apply_2set(self, all_hits, wearer) -> None:
         for hit in all_hits[wearer].values():
-            hit.add("elemental_mastery", 80, (self.artifact_set, 2))
+            hit.add("em_from_flat", 80, (self.artifact_set, 2))
 
     def apply_4set(self, all_hits, wearer) -> None:
         # 각 반응별로 스택이 쌓이는 건지, 하나 발동하면 전체가 오르는건지 확인 필요.

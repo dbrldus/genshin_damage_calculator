@@ -66,7 +66,7 @@ class KeyOfKhajNisut(Weapon):
         # 효과 2: 스택당 착용자 자신의 EM. 제3자에게 뿌리지 않으므로 그냥 add.
         self_bonus = lambda: source_hit.current_hp() * self._SELF_EM_PCT[r] * self._stacks
         for hit in all_hits[wearer].values():
-            hit.add("elemental_mastery", self_bonus, label, note="웅장한 시편")
+            hit.add("em_from_flat", self_bonus, label, note="웅장한 시편")
 
         # 효과 3: 3스택일 때 파티 전원(착용자 포함)의 EM. 제3자 대상이라 동명 무기 간
         # 비중첩 규약을 지키려면 apply_unique_buff로 제출한다.
@@ -75,7 +75,7 @@ class KeyOfKhajNisut(Weapon):
         party_bonus = lambda: source_hit.current_hp() * self._PARTY_EM_PCT[r]
         for char_hits in all_hits.values():
             for hit in char_hits.values():
-                hit.apply_unique_buff(label, "elemental_mastery", party_bonus)
+                hit.apply_unique_buff(label, "em_from_flat", party_bonus)
 
     # ── 의도적 미구현 ─────────────────────────────────────────────────────
     # · 「웅장한 시편」 20초 지속과 0.3초 재발동 제한, 3스택 갱신 판정 — 스택이 몇 개
