@@ -13,6 +13,7 @@ from .polearm import (
     BloodsoakedRuins,
     DragonsBane,
     FavoniusLance,
+    LumidouceElegy,
 )
 from .catalyst import (
     StarcallersWatch, CranesEchoingCall, FavoniusCodex, SacrificialFragments,
@@ -48,6 +49,7 @@ WEAPON_REGISTRY: dict[str, type[Weapon]] = {
     "피로 물든 성":          BloodsoakedRuins,
     "용학살창":             DragonsBane,
     "페보니우스 장창":         FavoniusLance,
+    "등방울꽃의 애가":         LumidouceElegy,
 }
 
 
