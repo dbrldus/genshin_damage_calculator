@@ -6,6 +6,7 @@ from .claymore import AThousandBlazingSuns, Verdict, ATeaspoonOfTranscendence, G
 from .sword import (
     PeakPatrolSong, SkywardBlade, AquilaFavonia, Azurelight,
     FavoniusSword, CalamityOfEshu,
+    LightbearingMoonshard,
 )
 from .polearm import (
     ProspectorsShovel, Deathmatch, DialoguesOfTheDesertSages,
@@ -63,6 +64,7 @@ WEAPON_REGISTRY: dict[str, type[Weapon]] = {
     "무공의 검":            TheUnforged,
     "늑대의 말로":           WolfsGravestone,
     "천공의 긍지":           SkywardPride,
+    "신월의 달빛":           LightbearingMoonshard,
 }
 
 

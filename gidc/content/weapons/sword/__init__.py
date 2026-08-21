@@ -4,3 +4,4 @@ from .rarity_5.aquila_favonia import AquilaFavonia
 from .rarity_5.azurelight import Azurelight
 from .rarity_4.favonius_sword import FavoniusSword
 from .rarity_4.calamity_of_eshu import CalamityOfEshu
+from .rarity_5.lightbearing_moonshard import LightbearingMoonshard
