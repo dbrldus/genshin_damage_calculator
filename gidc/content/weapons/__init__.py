@@ -27,6 +27,7 @@ from .polearm import (
     FavoniusLance,
     LumidouceElegy,
     CrimsonMoonsSemblance,
+    StaffOfTheScarletSands,
 )
 from .catalyst import (
     StarcallersWatch, CranesEchoingCall, FavoniusCodex, SacrificialFragments,
@@ -87,6 +88,7 @@ WEAPON_REGISTRY: dict[str, type[Weapon]] = {
     "오래된 자유의 서약":       FreedomSworn,
     "반암결록":             PrimordialJadeCutter,
     "참봉의 칼날":           SummitShaper,
+    "적색 사막의 지팡이":       StaffOfTheScarletSands,
 }
 
 
