@@ -2,7 +2,7 @@ from gidc.enums import WeaponType
 from gidc.core.weapon import Weapon, WeaponSubStat
 
 from ._default import DefaultWeapon
-from .claymore import AThousandBlazingSuns, Verdict, ATeaspoonOfTranscendence
+from .claymore import AThousandBlazingSuns, Verdict, ATeaspoonOfTranscendence, GestOfTheMightyWolf
 from .sword import (
     PeakPatrolSong, SkywardBlade, AquilaFavonia, Azurelight,
     FavoniusSword, CalamityOfEshu,
@@ -55,6 +55,7 @@ WEAPON_REGISTRY: dict[str, type[Weapon]] = {
     "붉은 달의 형상":         CrimsonMoonsSemblance,
     "나른한 새해":           NewYearsMorningHibernation,
     "초월의 열쇠":           ATeaspoonOfTranscendence,
+    "늑대의 무용담":          GestOfTheMightyWolf,
 }
 
 
