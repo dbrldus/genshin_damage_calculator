@@ -12,6 +12,7 @@ from .polearm import (
     FracturedHalo, SymphonistOfScents, SkywardSpine,
     BloodsoakedRuins,
     DragonsBane,
+    FavoniusLance,
 )
 from .catalyst import (
     StarcallersWatch, CranesEchoingCall, FavoniusCodex, SacrificialFragments,
@@ -46,6 +47,7 @@ WEAPON_REGISTRY: dict[str, type[Weapon]] = {
     "빛나는 마음":           VividNotions,
     "피로 물든 성":          BloodsoakedRuins,
     "용학살창":             DragonsBane,
+    "페보니우스 장창":         FavoniusLance,
 }
 
 
