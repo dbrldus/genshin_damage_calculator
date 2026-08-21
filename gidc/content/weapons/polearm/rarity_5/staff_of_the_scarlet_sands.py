@@ -37,26 +37,26 @@ class StaffOfTheScarletSands(Weapon):
         )
 
     # ── 효과 1·2 — 착용자의 최종 원소 마스터리 기반 (방식 B) ──────────────────
-    # 「원소 마스터리의 N%에 해당하는 공격력 보너스」는 EM을 다시 EM으로 재변환하는
-    # 효과가 아니라(수크로스 A4의 EM→EM과 다름) EM에 비례한 몫을 공격력으로 그대로
-    # 얻는 효과라 elemental_mastery를 그대로 읽는다(잎을 가르는 빛의 EM→피해와 같은
-    # 판단, convertible_em()이 아니다). 출력이 EM이 아니라 공격력이라 자기 참조 순환도
-    # 없으므로 atk_flat_derived가 아니라 atk_flat에 바로 쓴다(반암결록의 HP→공격력과
-    # 같은 판단).
+    # 이 무기의 EM→공격력 환산은 **%로 받은 EM 지분을 뺀 값**만 재료로 쓴다(설탕 A4처럼
+    # 남에게서 %-변환으로 받은 EM은 여기서 제외). 재변환 목적지가 EM이 아니라 공격력이라
+    # 다른 EM→피해 변환(잎을 가르는 빛 등)과는 다르지만, 「%-지분 제외」라는 재료 규칙
+    # 자체는 convertible_em()의 정의와 같으므로 그대로 가져다 쓴다. 출력이 EM이 아니라
+    # 공격력이라 자기 참조 순환은 없으므로 atk_flat_derived가 아니라 atk_flat에 바로
+    # 쓴다(반암결록의 HP→공격력과 같은 판단).
     def apply_passive_dependent(self, all_hits, wearer) -> None:
         r     = self.refinement - 1
         label = "무기: 적색 사막의 지팡이"
 
         source_hit = next(iter(all_hits[wearer].values()))
 
-        base_bonus = lambda: source_hit.elemental_mastery * self._BASE_EM_ATK_PCT[r]
+        base_bonus = lambda: source_hit.convertible_em() * self._BASE_EM_ATK_PCT[r]
         for hit in all_hits[wearer].values():
             hit.add("atk_flat", base_bonus, label, note="신기루 끝의 뜨거운 꿈")
 
         if not self._stacks:
             return
         stack_bonus = (
-            lambda: source_hit.elemental_mastery * self._STACK_EM_ATK_PCT[r] * self._stacks
+            lambda: source_hit.convertible_em() * self._STACK_EM_ATK_PCT[r] * self._stacks
         )
         for hit in all_hits[wearer].values():
             hit.add("atk_flat", stack_bonus, label, note="적색 사막의 꿈")
