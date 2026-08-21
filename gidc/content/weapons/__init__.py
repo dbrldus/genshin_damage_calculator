@@ -14,6 +14,7 @@ from .sword import (
     LightOfFoliarIncision,
     KeyOfKhajNisut,
     HaranGeppakuFutsu,
+    MistsplitterReforged,
 )
 from .polearm import (
     ProspectorsShovel, Deathmatch, DialoguesOfTheDesertSages,
@@ -79,6 +80,7 @@ WEAPON_REGISTRY: dict[str, type[Weapon]] = {
     "잎을 가르는 빛":         LightOfFoliarIncision,
     "성현의 열쇠":           KeyOfKhajNisut,
     "하란 월백의 후츠":        HaranGeppakuFutsu,
+    "안개를 가르는 회광":       MistsplitterReforged,
 }
 
 
