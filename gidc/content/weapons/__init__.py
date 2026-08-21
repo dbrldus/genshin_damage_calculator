@@ -22,6 +22,7 @@ from .catalyst import (
     AngelosHeptades,
     NocturnesCurtainCall,
     VividNotions,
+    NewYearsMorningHibernation,
 )
 
 WEAPON_REGISTRY: dict[str, type[Weapon]] = {
@@ -52,6 +53,7 @@ WEAPON_REGISTRY: dict[str, type[Weapon]] = {
     "페보니우스 장창":         FavoniusLance,
     "등방울꽃의 애가":         LumidouceElegy,
     "붉은 달의 형상":         CrimsonMoonsSemblance,
+    "나른한 새해":           NewYearsMorningHibernation,
 }
 
 

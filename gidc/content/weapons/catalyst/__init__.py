@@ -6,3 +6,4 @@ from .rarity_3.thrilling_tales_of_dragon_slayers import ThrillingTalesOfDragonSl
 from .rarity_5.angelos_heptades import AngelosHeptades
 from .rarity_5.nocturnes_curtain_call import NocturnesCurtainCall
 from .rarity_5.vivid_notions import VividNotions
+from .rarity_5.new_years_morning_hibernation import NewYearsMorningHibernation
