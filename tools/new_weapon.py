@@ -158,8 +158,13 @@ def check_values(values: dict, passive_text: str) -> list[str]:
     for name, (nums, raw, pct) in values.items():
         if len(nums) != 5:
             raise SpecError(f"'{name}'의 정련 값이 {len(nums)}개입니다 — 5개여야 합니다: {raw}")
-        if any(b < a for a, b in zip(nums, nums[1:])):
-            raise SpecError(f"'{name}'이 단조 증가가 아닙니다: {raw}")
+        # 정련이 오를수록 커지는 값이 대부분이지만 **줄어드는** 값도 있다 — 페보니우스
+        # 계열의 발동 간격 12/10.5/9/7.5/6이 그렇다. 방향은 가리지 않고, 오르내림이 섞인
+        # 것만 막는다. 그건 옮겨 적다 틀린 것이다.
+        steps_up   = all(b >= a for a, b in zip(nums, nums[1:]))
+        steps_down = all(b <= a for a, b in zip(nums, nums[1:]))
+        if not (steps_up or steps_down):
+            raise SpecError(f"'{name}'이 단조 수열이 아닙니다 — 오르내림이 섞였습니다: {raw}")
         # 원문은 `12%/15%/18%/21%/24%`처럼 퍼센트가 사이사이에 낀다. 자료를 고치지 않고
         # 비교하려면 양쪽에서 기호를 걷어 내고 숫자열만 남긴다.
         flat = passive_text.replace("%", "").replace(" ", "").replace(",", "")
