@@ -15,6 +15,7 @@ from .sword import (
     KeyOfKhajNisut,
     HaranGeppakuFutsu,
     MistsplitterReforged,
+    FreedomSworn,
 )
 from .polearm import (
     ProspectorsShovel, Deathmatch, DialoguesOfTheDesertSages,
@@ -81,6 +82,7 @@ WEAPON_REGISTRY: dict[str, type[Weapon]] = {
     "성현의 열쇠":           KeyOfKhajNisut,
     "하란 월백의 후츠":        HaranGeppakuFutsu,
     "안개를 가르는 회광":       MistsplitterReforged,
+    "오래된 자유의 서약":       FreedomSworn,
 }
 
 
