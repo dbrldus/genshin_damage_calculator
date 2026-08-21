@@ -8,3 +8,4 @@ from .rarity_5.lightbearing_moonshard import LightbearingMoonshard
 from .rarity_5.athame_artis import AthameArtis
 from .rarity_5.absolution import Absolution
 from .rarity_5.uraku_misugiri import UrakuMisugiri
+from .rarity_5.splendor_of_tranquil_waters import SplendorOfTranquilWaters
