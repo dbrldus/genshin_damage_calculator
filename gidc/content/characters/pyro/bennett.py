@@ -2,7 +2,7 @@ from gidc.core.character import Character, clamp_talent_index
 from gidc.core.profile import SkillHit, SkillType, ScalingStat
 from gidc.enums import Element
 from gidc.enums import WeaponType
-from gidc.prompt import ask_bool
+from gidc.prompt import ask_bool, ask_choice
 
 
 class Bennett(Character):
@@ -134,6 +134,11 @@ class Bennett(Character):
         # C1 미만: Q 공격력 증가는 파티원 HP ≥ 70% 조건 필요
         hp_ok = (c >= 1) or ask_bool("[베넷 Q] 파티원 HP 70% 이상 여부")
 
+        # Q 버프는 「영역 안에 있는 캐릭터」에게만 붙는다 — 영역이 살아 있어도 밖에 선
+        # 캐릭터는 공격력 증가도 C6 불 피해 보너스도 받지 못한다. 그래서 활성 여부와
+        # 별개로 대상을 따로 받는다. (C6도 같은 대상을 쓴다 — apply_party_buffs 참고)
+        self._on_field = self._ask_field_member(all_hits)
+
         if hp_ok:
             bl = self._burst_index()
             ratio = self._BURST_ATK_RATIO[bl]
@@ -147,9 +152,8 @@ class Bennett(Character):
             # (유저 실측). 받는 캐릭터의 최종 공격력에는 그대로 들어가지만, 그 캐릭터의
             # 공격력을 읽어 버프를 만드는 쪽(마비카·이네파·제사의 여운 등)의 재료에서는
             # 빠진다. 니콜 E처럼 계수표의 상수로 적힌 값만 atk_flat에 남는다.
-            for char_hits in all_hits.values():
-                for hit in char_hits.values():
-                    hit.add("atk_from_pct_share", flat_atk, self, note="Q 아름다운 여정")
+            for hit in all_hits[self._on_field].values():
+                hit.add("atk_from_pct_share", flat_atk, self, note="Q 아름다운 여정")
 
     # C6: pyro_dmg_bonus는 코어 스탯도 스탯 스케일도 아니므로 apply_party_buffs.
     def apply_party_buffs(self, all_hits: dict["Character", dict[str, SkillHit]]) -> None:
@@ -157,11 +161,27 @@ class Bennett(Character):
             return
 
         # C6: 한/양손검/장병기 캐릭터 — 불 피해 보너스 +15%
+        # C6도 영역 안에서만 걸린다 — 무기 종류만 맞으면 되는 게 아니다.
         melee = {WeaponType.SWORD, WeaponType.CLAYMORE, WeaponType.POLEARM}
-        for char, char_hits in all_hits.items():
-            if char.weapon is not None and char.weapon.weapon_type in melee:
-                for hit in char_hits.values():
-                    hit.add("pyro_dmg_bonus", 0.15, self, note="C6 근접 무기")
+        char = self._on_field
+        if char.weapon is not None and char.weapon.weapon_type in melee:
+            for hit in all_hits[char].values():
+                hit.add("pyro_dmg_bonus", 0.15, self, note="C6 근접 무기")
 
     def apply_dependent_buffs(self, all_hits: dict["Character", dict[str, SkillHit]]) -> None:
         pass  # 최종 스탯을 읽어 스케일하는 버프 없음
+
+    def _ask_field_member(self, all_hits: dict["Character", dict[str, SkillHit]]) -> "Character":
+        """아름다운 여정 영역 안에 있는 캐릭터를 고르게 한다 — Q 버프의 실제 대상.
+
+        정상적인 로테이션에서는 필드 위 캐릭터가 한 명뿐이고 그 한 명이 곧 영역 안에
+        있는 캐릭터다. 그래서 복수 선택이 아니라 한 명을 고른다. 베넷 자신도 영역 안에
+        설 수 있으므로 후보에 넣고, 파티원이 1명뿐이면 다른 경우가 없어 묻지 않는다."""
+        members = list(all_hits.keys())
+        if len(members) == 1:
+            return members[0]
+        options = [
+            f"{char.name} ({char.element.value})" + (" ← 베넷" if char is self else "")
+            for char in members
+        ]
+        return members[ask_choice("[베넷 Q] 아름다운 여정 영역 안에 있는 캐릭터", options)]
