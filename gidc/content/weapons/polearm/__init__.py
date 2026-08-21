@@ -5,3 +5,4 @@ from .rarity_5.fractured_halo import FracturedHalo
 from .rarity_5.symphonist_of_scents import SymphonistOfScents
 from .rarity_5.skyward_spine import SkywardSpine
 from .rarity_5.bloodsoaked_ruins import BloodsoakedRuins
+from .rarity_4.dragons_bane import DragonsBane
