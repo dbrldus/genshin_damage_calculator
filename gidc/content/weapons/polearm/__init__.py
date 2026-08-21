@@ -14,3 +14,4 @@ from .rarity_5.calamity_queller import CalamityQueller
 from .rarity_5.engulfing_lightning import EngulfingLightning
 from .rarity_5.staff_of_homa import StaffOfHoma
 from .rarity_5.vortex_vanquisher import VortexVanquisher
+from .rarity_5.primordial_jade_winged_spear import PrimordialJadeWingedSpear

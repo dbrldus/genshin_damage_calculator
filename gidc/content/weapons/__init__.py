@@ -32,6 +32,7 @@ from .polearm import (
     EngulfingLightning,
     StaffOfHoma,
     VortexVanquisher,
+    PrimordialJadeWingedSpear,
 )
 from .catalyst import (
     StarcallersWatch, CranesEchoingCall, FavoniusCodex, SacrificialFragments,
@@ -97,6 +98,7 @@ WEAPON_REGISTRY: dict[str, type[Weapon]] = {
     "예초의 번개":           EngulfingLightning,
     "호마의 지팡이":          StaffOfHoma,
     "관홍의 창":            VortexVanquisher,
+    "화박연":              PrimordialJadeWingedSpear,
 }
 
 
