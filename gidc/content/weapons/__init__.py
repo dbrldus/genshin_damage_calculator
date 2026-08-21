@@ -11,6 +11,7 @@ from .sword import (
     Absolution,
     UrakuMisugiri,
     SplendorOfTranquilWaters,
+    LightOfFoliarIncision,
 )
 from .polearm import (
     ProspectorsShovel, Deathmatch, DialoguesOfTheDesertSages,
@@ -73,6 +74,7 @@ WEAPON_REGISTRY: dict[str, type[Weapon]] = {
     "사면":               Absolution,
     "우라쿠의 미스기리":        UrakuMisugiri,
     "고요히 샘솟는 빛":        SplendorOfTranquilWaters,
+    "잎을 가르는 빛":         LightOfFoliarIncision,
 }
 
 

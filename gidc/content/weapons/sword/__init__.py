@@ -9,3 +9,4 @@ from .rarity_5.athame_artis import AthameArtis
 from .rarity_5.absolution import Absolution
 from .rarity_5.uraku_misugiri import UrakuMisugiri
 from .rarity_5.splendor_of_tranquil_waters import SplendorOfTranquilWaters
+from .rarity_5.light_of_foliar_incision import LightOfFoliarIncision
