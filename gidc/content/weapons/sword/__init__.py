@@ -15,3 +15,4 @@ from .rarity_5.haran_geppaku_futsu import HaranGeppakuFutsu
 from .rarity_5.mistsplitter_reforged import MistsplitterReforged
 from .rarity_5.freedom_sworn import FreedomSworn
 from .rarity_5.primordial_jade_cutter import PrimordialJadeCutter
+from .rarity_5.summit_shaper import SummitShaper
