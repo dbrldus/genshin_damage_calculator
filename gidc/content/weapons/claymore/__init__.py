@@ -2,3 +2,4 @@ from .rarity_5.a_thousand_blazing_suns import AThousandBlazingSuns
 from .rarity_5.verdict import Verdict
 from .rarity_5.a_teaspoon_of_transcendence import ATeaspoonOfTranscendence
 from .rarity_5.gest_of_the_mighty_wolf import GestOfTheMightyWolf
+from .rarity_5.fang_of_the_mountain_king import FangOfTheMountainKing
