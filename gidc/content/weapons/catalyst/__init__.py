@@ -3,3 +3,6 @@ from .rarity_5.cranes_echoing_call import CranesEchoingCall
 from .rarity_4.favonius_codex import FavoniusCodex
 from .rarity_4.sacrificial_fragments import SacrificialFragments
 from .rarity_3.thrilling_tales_of_dragon_slayers import ThrillingTalesOfDragonSlayers
+from .rarity_5.angelos_heptades import AngelosHeptades
+from .rarity_5.nocturnes_curtain_call import NocturnesCurtainCall
+from .rarity_5.vivid_notions import VividNotions

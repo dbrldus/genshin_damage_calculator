@@ -13,7 +13,10 @@ from .polearm import (
 )
 from .catalyst import (
     StarcallersWatch, CranesEchoingCall, FavoniusCodex, SacrificialFragments,
-    ThrillingTalesOfDragonSlayers, 
+    ThrillingTalesOfDragonSlayers,
+    AngelosHeptades,
+    NocturnesCurtainCall,
+    VividNotions,
 )
 
 WEAPON_REGISTRY: dict[str, type[Weapon]] = {
@@ -36,6 +39,9 @@ WEAPON_REGISTRY: dict[str, type[Weapon]] = {
     "페보니우스 비전":      FavoniusCodex,
     "제례의 악장":          SacrificialFragments,
     "드래곤 슬레이어 영웅담": ThrillingTalesOfDragonSlayers,
+    "일곱빛 계시":           AngelosHeptades,
+    "막간의 야상곡":          NocturnesCurtainCall,
+    "빛나는 마음":           VividNotions,
 }
 
 
