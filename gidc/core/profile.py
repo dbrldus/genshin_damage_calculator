@@ -246,9 +246,29 @@ class SkillHit:
     aggravate_crit_dmg:          float = 0.0
     spread_crit_rate:            float = 0.0
     spread_crit_dmg:             float = 0.0
-    # 달반응(달감전/달개화/달결정)에는 반응 전용 추가 치명타 옵션이 게임에 존재하지 않는다.
-    # 달반응 피해는 캐릭터 본인의 crit_rate/crit_dmg로 치명타 판정하므로 전용 필드를 두지 않는다.
-    # 별 반응도 같다 — 계산식이 달반응과 동일하다.
+    # 달반응은 캐릭터 본인의 crit_rate/crit_dmg로 치명타 판정한다. 다만 「달빛 반응의 치명타
+    # 피해」만 따로 올리는 옵션이 있어(막간의 야상곡), 그 몫은 전용 필드에 담고 달반응 컨텍스트를
+    # 만들 때 캐릭터 치명타 피해에 더한다(build_lunar_reaction_context).
+    #
+    # 히트 전역인 crit_dmg에 바로 더하면 그 캐릭터의 직접 피해(일반/스킬/폭발)까지 오염된다.
+    # 반대로 「달반응 히트에만 넣기」도 불가능하다 — 달반응 반응 피해는 SkillHit이 아니라 별도
+    # 피해 인스턴스이고 캐리어 히트의 스탯을 읽어 갈 뿐이다. 그래서 격변 반응과 같은 규약
+    # ({접두}_crit_dmg)으로 나눠 두고 읽는 자리에서 합산한다 — _reaction_crit_dmg가 접두사
+    # 표(_REACTION_PREFIX)로 골라 읽으므로 필드를 선언하는 것만으로 연결된다.
+    #
+    # 별 반응과 치명타 **확률** 쪽은 아직 그런 옵션을 가진 장비가 없지만, 계산식이 달반응과
+    # 같아 언제든 나올 수 있는 자리다. 격변 반응이 확률/피해 짝으로 선언돼 있는 것과 맞춰
+    # 미리 대칭으로 세워 둔다 — 값이 0이면 어느 경로에도 영향이 없다.
+    lunar_charged_crit_rate:     float = 0.0
+    lunar_charged_crit_dmg:      float = 0.0
+    lunar_bloom_crit_rate:       float = 0.0
+    lunar_bloom_crit_dmg:        float = 0.0
+    lunar_crystallize_crit_rate: float = 0.0
+    lunar_crystallize_crit_dmg:  float = 0.0
+    stellar_conduct_crit_rate:   float = 0.0
+    stellar_conduct_crit_dmg:    float = 0.0
+    stellar_swirl_crit_rate:     float = 0.0
+    stellar_swirl_crit_dmg:      float = 0.0
     #endregion
 
     # ── 방어력 감소 / 무시 / 배율 ──────────────────────────────────────────
@@ -680,6 +700,17 @@ def _reaction_crit_dmg(hit: SkillHit, reaction_type: ReactionType) -> float:
     return getattr(hit, f"{prefix}_crit_dmg", 0.0) if prefix else 0.0
 
 
+def _celestial_crit_fields(reaction_type: ReactionType) -> frozenset[str]:
+    """그 달·별 반응의 **반응 전용 치명타** 필드 짝. 설명 화면의 '적용됨' 판정용이다.
+
+    이름을 손으로 적는 곳을 만들지 않으려고 접두사 표에서 유도한다 — 컨텍스트 빌더가
+    _reaction_crit_rate/_reaction_crit_dmg로 읽는 것과 같은 출처다."""
+    prefix = _REACTION_PREFIX.get(reaction_type)
+    if not prefix:
+        return frozenset()
+    return frozenset({f"{prefix}_crit_rate", f"{prefix}_crit_dmg"})
+
+
 # ── 반응 배율표 ──────────────────────────────────────────────────────────
 # 대부분 반응별 고정값. 증발/융해는 트리거 원소, 달반응은 dmg_type에 따라 갈린다.
 _REACTION_MULT_CONST: dict[ReactionType, float] = {
@@ -705,6 +736,23 @@ _LUNAR_MULT: dict[ReactionType, dict[DmgType, float]] = {
 
 # 달반응 3종 — dmg_type이 두 자리(LUNAR_DIRECT/LUNAR_REACTION) 모두 유효한 유일한 반응.
 _LUNAR_REACTIONS = frozenset(_LUNAR_MULT)
+
+# 달반응 3종의 「반응 전용 치명타 피해」 필드. 접두사 표에서 유도하므로 이름을 손으로
+# 적는 곳이 없다 — 반응이 늘면 여기가 저절로 따라온다.
+_ALL_LUNAR_CRIT_DMG_FIELDS: tuple[str, ...] = tuple(
+    f"{_REACTION_PREFIX[r]}_crit_dmg" for r in sorted(_LUNAR_REACTIONS, key=lambda r: r.name)
+)
+
+
+def add_all_lunar_crit_dmg(
+    hit: SkillHit, value: float, source: object = "(미계측)", *, note: str = ""
+) -> None:
+    """달반응 3종(달감전·달개화·달결정)의 반응 전용 치명타 피해를 모두 증가시킨다.
+
+    「달빛 반응의 치명타 피해가 증가한다」는 문구가 반응을 가리지 않을 때 쓴다. 특정 달반응
+    하나만 올리는 효과는 이 헬퍼가 아니라 그 반응의 필드를 직접 짚는다."""
+    for name in _ALL_LUNAR_CRIT_DMG_FIELDS:
+        hit.add(name, value, source, note=note)
 
 # 별 반응 2종. 달반응처럼 dmg_type 두 자리(STELLAR_DIRECT/STELLAR_REACTION)가 모두 유효하다.
 #
@@ -984,6 +1032,11 @@ def build_lunar_reaction_context(
         # 달반응은 캐릭터 치명타를 쓴다 — 격변과 갈리는 자리다.
         crit_rate = hit.crit_rate,
         crit_dmg  = hit.crit_dmg,
+        # 「달빛 반응의 치명타 피해」처럼 그 반응에만 붙는 몫(막간의 야상곡)은 전용 슬롯으로
+        # 따로 넘기고 _calc_lunar_reaction이 캐릭터 치명타에 더한다 — build_damage_context와
+        # 같은 규약이다. 반응별 필드라 달감전만 올리는 버프가 달개화에 새지 않는다.
+        reaction_crit_rate = _reaction_crit_rate(hit, reaction),
+        reaction_crit_dmg  = _reaction_crit_dmg(hit, reaction),
 
         char_level = char_level,
         # 적 기본 내성은 enemy에서, 내성 **감소**는 캐리어(= 트리거 캐릭터가 받은 버프)에서.
@@ -1013,6 +1066,10 @@ def lunar_reaction_input_fields(
         # 격변과 달리 캐릭터 치명타를 쓴다.
         "crit_rate", "crit_dmg",
     }
+
+    # 「달빛 반응의 치명타 피해」 전용 몫 — 반응별 필드라 여기서도 반응으로 골라야
+    # 달감전만 올리는 버프가 달개화 설명에 적용됨으로 뜨지 않는다.
+    fields |= _celestial_crit_fields(reaction)
 
     # 기초 피해 증가는 그 반응 전용 필드 하나다 — 이름을 손으로 적으면 「달감전만」 올리는
     # 버프(이네파 Moonsign)가 달개화 설명에 적용됨으로 뜬다.
@@ -1066,9 +1123,13 @@ def build_stellar_reaction_context(
         celestial_base_dmg_bonus = _celestial_base_dmg_bonus(hit, reaction),
         elevation_multiplier     = hit.elevation_multiplier,
 
-        # 별 반응도 캐릭터 치명타를 쓴다 — 반응 전용 치명타 옵션이 없다.
+        # 별 반응도 캐릭터 치명타를 쓴다. 반응 전용 몫은 달반응과 같은 규약으로 전용 슬롯에
+        # 담아 넘긴다 — 아직 별 반응 전용 치명타를 주는 장비는 없어 값은 0이지만, 생기는 날
+        # 이 함수를 고칠 일이 없다.
         crit_rate = hit.crit_rate,
         crit_dmg  = hit.crit_dmg,
+        reaction_crit_rate = _reaction_crit_rate(hit, reaction),
+        reaction_crit_dmg  = _reaction_crit_dmg(hit, reaction),
 
         char_level = char_level,
         enemy_resistance = _enemy_resistance(hit, enemy, element),
@@ -1095,6 +1156,9 @@ def stellar_reaction_input_fields(
         # 반응 배율의 재료. 별 초전도는 반응 피해가 없으므로 기록 히트 수는 여기 없다.
         "stellar_gust_level",
     }
+
+    # 반응 전용 치명타 — 달반응 쪽과 같은 규칙이다(_celestial_crit_fields).
+    fields |= _celestial_crit_fields(reaction)
 
     base = celestial_base_dmg_bonus_field(reaction)
     if base:
@@ -1179,13 +1243,16 @@ def damage_input_fields(
     if dmg_type is not DmgType.TRANSFORMATIVE:
         fields.add("flat_dmg_bonus")
 
-    # 격변 피해만 반응 전용 치명타 필드를 쓴다 (_calc_transformative). 나머지는 평소 치명타.
+    # 격변은 반응 전용 치명타 **만** 쓴다 (_calc_transformative — 캐릭터 치명타를 안 읽는다).
+    # 달·별 직접 피해는 **둘 다** 쓴다 (_calc_lunar_direct가 더한다). 나머지는 평소 치명타뿐.
+    prefix = _REACTION_PREFIX.get(reaction_type)
     if dmg_type is DmgType.TRANSFORMATIVE:
-        prefix = _REACTION_PREFIX.get(reaction_type)
         if prefix:
             fields |= {f"{prefix}_crit_rate", f"{prefix}_crit_dmg"}
     else:
         fields |= {"crit_rate", "crit_dmg"}
+        if prefix and dmg_type in (DmgType.LUNAR_DIRECT, DmgType.STELLAR_DIRECT):
+            fields |= {f"{prefix}_crit_rate", f"{prefix}_crit_dmg"}
 
     if dmg_type in _DMG_TYPES_WITH_STAT:
         fields.add("coeff")

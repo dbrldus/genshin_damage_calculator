@@ -246,7 +246,11 @@ def _calc_lunar_direct(ctx: DamageContext, trace: list | None = None) -> DamageR
         _t(trace, "1+em+reaction", 1.0 + em_bonus + ctx.reaction_bonus)
         _t(trace, "flat_dmg_bonus", ctx.flat_dmg_bonus)
         _t(trace, "res_mult", res_m); _t(trace, "elevation", ctx.elevation_multiplier)
-    return _to_result(base_dmg, combined_mult, ctx.crit_rate, ctx.crit_dmg, trace)
+    # 캐릭터 치명타 + 그 반응 전용 치명타. 후자는 「달빛 반응의 치명타 피해」처럼 반응에만
+    # 붙는 몫이며(막간의 야상곡), 전용 필드가 비어 있으면 0이라 기존 계산은 그대로다.
+    return _to_result(base_dmg, combined_mult,
+                      ctx.crit_rate + ctx.reaction_crit_rate,
+                      ctx.crit_dmg  + ctx.reaction_crit_dmg, trace)
 
 
 def _calc_lunar_reaction(ctx: DamageContext, trace: list | None = None) -> DamageResult:
@@ -270,7 +274,10 @@ def _calc_lunar_reaction(ctx: DamageContext, trace: list | None = None) -> Damag
         _t(trace, "1+lunar_base", 1.0 + ctx.celestial_base_dmg_bonus)
         _t(trace, "em_bonus", em_bonus); _t(trace, "reaction_bonus", ctx.reaction_bonus)
         _t(trace, "res_mult", res_m); _t(trace, "elevation", ctx.elevation_multiplier)
-    return _to_result(base_dmg, combined_mult, ctx.crit_rate, ctx.crit_dmg, trace)
+    # _calc_lunar_direct와 같은 규칙 — 캐릭터 치명타 + 그 반응 전용 치명타.
+    return _to_result(base_dmg, combined_mult,
+                      ctx.crit_rate + ctx.reaction_crit_rate,
+                      ctx.crit_dmg  + ctx.reaction_crit_dmg, trace)
 
 
 # ── 진입점 ────────────────────────────────────────────────────────────
