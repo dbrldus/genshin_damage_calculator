@@ -85,6 +85,20 @@ class Weapon(ABC):
         if self.sub_stat:
             apply_stat(hit, self.sub_stat.stat_type, self.sub_stat.scaled, "무기 부옵션")
 
+    # ── 무기가 만드는 추가 타격 히트 — 기본 no-op ────────────────────────────
+    #    Phase 1(히트 생성)에서 build_hits() 직후에 호출된다. 무기 패시브가 **새 히트**를
+    #    만드는 경우(천공 시리즈의 진공의 칼날)만 재정의한다.
+    #
+    #    왜 Phase 3(apply_passive)이 아니라 여기인가 — Phase 3은 기초 스탯·무기 부옵션·
+    #    성유물 옵션·세트 효과가 이미 실린 뒤다(Character.apply_primary_buffs 참고).
+    #    그때 히트를 끼워 넣으면 atk_base가 0인 채로 남아 아무것도 곱하지 못한다.
+    #    Phase 1에 넣어야 이후 모든 단계가 이 히트를 캐릭터 히트와 똑같이 훑는다.
+    #
+    #    유저 입력은 여기서 묻지 않는다 — 질문은 종전대로 apply_passive(Phase 3)에 모으고,
+    #    조건이 꺼져 있으면 그쪽에서 이 히트를 도로 뺀다.
+    def add_hits(self, hits: dict[str, SkillHit], wearer: Character) -> None:
+        pass
+
     # ── 무기 패시브 (기여) — 각 무기 서브클래스에서 고유 효과 구현.
     #    self.refinement(1~5)를 읽어 재련 단계별 배율을 적용한다.
     #    apply_primary_buffs(Phase 3)에서 호출된다 — 스탯 확정 전. 고정/flat·% 기여만.

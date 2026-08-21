@@ -5,7 +5,7 @@
 
     Phase 0   특성 레벨 보정      파티 구성만 보고 결정 (스커크 「무예 전수」).
                                   계수 표를 고르는 값이라 히트 생성보다 먼저 확정한다.
-    Phase 1   히트 생성           build_hits() — 계수/원소/스킬 종류만. 스탯은 기본값.
+    Phase 1   히트 생성           build_hits() + 무기 추가 타격. 스탯은 기본값.
     Phase 2   파티 편성 버프      원소 공명, 환상극 버프. 스탯을 읽지 않는 가산뿐.
     Phase 3   개인 버프           기초/장비 스탯 → 세트·무기 기여 패시브 → apply_self_buffs.
     Phase 4   코어 스탯 기여      contribute_dependent_stats — 크로스 캐릭터 ATK/DEF/HP/EM.
@@ -52,7 +52,7 @@ class Party:
             char.burst_level_bonus = 0
 
         # Phase 1 : 히트 서술자 생성 (스탯은 기본값)
-        self.all_hits = {char: char.build_hits() for char in self.members}
+        self.all_hits = {char: char.build_hits_with_weapon() for char in self.members}
 
         # Phase 2 : 원소 공명 & 환상극 버프
         _apply_elemental_resonance(self.all_hits, self.members)

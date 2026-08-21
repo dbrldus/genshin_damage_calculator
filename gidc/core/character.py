@@ -227,6 +227,21 @@ class Character(ABC):
         """히트 서술자만 설정하고 스탯은 기본값으로 반환한다."""
         ...
 
+    def build_hits_with_weapon(self) -> dict[str, SkillHit]:
+        """Phase 1 — 캐릭터 히트 + 무기 패시브가 만드는 추가 타격(천공 시리즈의 진공의 칼날).
+
+        무기 추가 타격을 Phase 3(apply_passive)이 아니라 이 자리에서 만드는 이유는,
+        Phase 3이 기초 스탯·무기 부옵션·성유물 옵션·세트 효과를 이미 다 실은 뒤이기
+        때문이다(apply_primary_buffs 참고). 그 시점에 끼워 넣은 히트는 atk_base가 0인 채로
+        남아 아무것도 곱하지 못한다. 여기서 만들면 이후 모든 단계가 캐릭터 히트와 똑같이
+        훑어 준다.
+
+        Party(Phase 1)와 build_stat_sheet(솔로 경로)가 함께 부르는 단일 출처다."""
+        hits = self.build_hits()
+        if self.weapon:
+            self.weapon.add_hits(hits, self)
+        return hits
+
     @abstractmethod
     def apply_self_buffs(self, hits: dict[str, SkillHit]) -> None:
         """자신의 모든 히트에 global + hit-specific 버프를 적용한다.
@@ -369,7 +384,7 @@ class Character(ABC):
 
     def build_stat_sheet(self) -> dict[str, SkillHit]:
         """솔로 경로 편의 메서드 — Party 없이 단일 캐릭터 계산 시 사용."""
-        all_hits = {self: self.build_hits()}
+        all_hits = {self: self.build_hits_with_weapon()}
         self.apply_primary_buffs(all_hits)
         self.contribute_dependent_stats(all_hits)   # 코어 스탯(atk/def/hp/em) 기여
         self.apply_party_buffs(all_hits)             # 코어/스케일 아닌 크로스 버프

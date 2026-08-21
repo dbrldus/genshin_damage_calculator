@@ -83,6 +83,11 @@ class SkillType(Enum):
     PLUNGING    = "낙하 공격"
     SKILL       = "원소 스킬"
     BURST       = "원소 폭발"
+    # 무기 패시브가 만드는 추가 타격 (천공 시리즈의 진공의 칼날 등).
+    # _SKILL_PREFIX에 **일부러 넣지 않는다** — 스킬 타입별 피해 보너스를 받지 않는 것이
+    # 이 타입의 정의다. skill_dmg_field가 None을 주고 _skill_dmg_bonus가 0.0으로 접는다.
+    # 일반 공격 명중으로 발동하더라도 「일반 공격 피해 보너스」는 붙지 않는다.
+    WEAPON      = "무기 추가 타격"
 
 
 class ScalingStat(Enum):
