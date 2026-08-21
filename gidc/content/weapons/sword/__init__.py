@@ -7,3 +7,4 @@ from .rarity_4.calamity_of_eshu import CalamityOfEshu
 from .rarity_5.lightbearing_moonshard import LightbearingMoonshard
 from .rarity_5.athame_artis import AthameArtis
 from .rarity_5.absolution import Absolution
+from .rarity_5.uraku_misugiri import UrakuMisugiri
