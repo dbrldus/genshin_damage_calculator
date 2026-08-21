@@ -13,3 +13,4 @@ from .rarity_5.staff_of_the_scarlet_sands import StaffOfTheScarletSands
 from .rarity_5.calamity_queller import CalamityQueller
 from .rarity_5.engulfing_lightning import EngulfingLightning
 from .rarity_5.staff_of_homa import StaffOfHoma
+from .rarity_5.vortex_vanquisher import VortexVanquisher
