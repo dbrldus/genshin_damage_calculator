@@ -271,13 +271,13 @@ class Iansan(Character):
         # 재료에서 빠져야 한다. 게임은 수정자를 순서대로 접어 자기 출력이 자기 입력에 섞이지
         # 않지만, 이 엔진은 순서를 버리고 지연 평가로 값을 정하므로 같은 슬롯을 읽고 쓰면
         # 값이 정해지지 않는다(얀사 자신을 필드 위로 고르면 바로 그 경우다). 그래서 출력은
-        # 꼬리표 달린 별도 슬롯 atk_flat_derived로 간다 — 최종 공격력에는 그대로 들어가므로
+        # 꼬리표 달린 별도 슬롯 atk_from_pct_share로 간다 — 최종 공격력에는 그대로 들어가므로
         # 스탯 시트도, 얀사 공격력을 다시 읽는 세트·무기(제사의 여운 등)도 정상적으로 본다.
         source_hit = next(iter(all_hits[self].values()))
         bonus = lambda: self._measurer_atk_bonus(source_hit.convertible_atk())
 
         for hit in all_hits[self._on_field].values():
-            hit.add("atk_flat_derived", bonus, self, note="Q 운동량 측정기")
+            hit.add("atk_from_pct_share", bonus, self, note="Q 운동량 측정기")
 
     # ── 의도적 미구현 ─────────────────────────────────────────────────────
     # · 밤혼 수지 전반 (E 54pt 회복, Q 15pt 획득, A1의 추가 회복 1pt/4pt, C4 「원기」와 초과량

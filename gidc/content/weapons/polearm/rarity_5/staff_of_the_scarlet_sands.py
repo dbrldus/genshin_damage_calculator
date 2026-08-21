@@ -42,7 +42,7 @@ class StaffOfTheScarletSands(Weapon):
     # em_from_flat을 읽는다. 재변환 목적지가 EM이 아니라 공격력이라 EM→피해 변환(잎을
     # 가르는 빛 등)과는 다르지만, 「%-지분 제외」라는 재료 규칙은 같은 쪽이다.
     #
-    # 출력은 EM이 아니라 공격력이라 자기 참조 순환이 없으므로 atk_flat_derived가 아니라
+    # 출력은 EM이 아니라 공격력이라 자기 참조 순환이 없으므로 atk_from_pct_share가 아니라
     # atk_flat에 바로 쓴다(반암결록의 HP→공격력과 같은 판단).
     def apply_passive_dependent(self, all_hits, wearer) -> None:
         r     = self.refinement - 1

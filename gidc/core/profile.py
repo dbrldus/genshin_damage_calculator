@@ -145,7 +145,7 @@ class SkillHit:
     # 뺄셈이 아니라 **별도 필드**여야 한다: 재료 쪽이 atk_flat을 읽는 순간 자기 몫의
     # 미결 지연 기여가 확정을 요구해 다시 순환이 된다. EM 쪽(em_from_flat /
     # em_from_pct_share)도 같은 이유로 같은 모양이다.
-    atk_flat_derived: float = 0.0
+    atk_from_pct_share: float = 0.0
     #endregion
 
     # ── 전투 스탯 ────────────────────────────────────────────────────────────
@@ -165,7 +165,7 @@ class SkillHit:
     #     읽어야 했고, 그 읽기가 지분의 미결 지연 기여를 확정시켜 **값으로는 정확히
     #     상쇄되는** 관계까지 CyclicBuffError로 잡혔다(이네파 A4 + 적색 사막의 지팡이).
     #     조각을 나누면 재료 쪽이 지분 필드를 아예 건드리지 않아 간선 자체가 없다.
-    # atk_flat / atk_flat_derived가 같은 이유로 이미 같은 모양이다.
+    # atk_flat / atk_from_pct_share가 같은 이유로 이미 같은 모양이다.
     em_from_flat: float = 0.0
     em_from_pct_share: float = 0.0
     energy_recharge:   float = 1.0
@@ -351,7 +351,7 @@ class SkillHit:
     # 지연 기여는 그보다 앞선 Phase 5.5에 계산되기 때문이다. *_final은 히트 자신이
     # 피해를 계산할 때 쓰는 값이고, 이쪽은 '지금까지 누적된 스탯'을 즉석에서 구한다.
     def current_hp(self)  -> float: return self.hp_base  * (1.0 + self.hp_pct)  + self.hp_flat
-    def current_atk(self) -> float: return self.atk_base * (1.0 + self.atk_pct) + self.atk_flat + self.atk_flat_derived
+    def current_atk(self) -> float: return self.atk_base * (1.0 + self.atk_pct) + self.atk_flat + self.atk_from_pct_share
     def current_def(self) -> float: return self.def_base * (1.0 + self.def_pct) + self.def_flat
 
     @property
@@ -372,7 +372,7 @@ class SkillHit:
         return self.em_from_flat + self.em_from_pct_share
 
     def convertible_atk(self) -> float:
-        """**공격력 → 공격력** 변환 버프만 읽는 공격력. 파생 지분(atk_flat_derived)은 뺀다.
+        """**공격력 → 공격력** 변환 버프만 읽는 공격력. 파생 지분(atk_from_pct_share)은 뺀다.
 
         게임의 스탯은 수정자를 순서대로 접은 결과라 i번째 수정자가 i-1까지의 값만 보고,
         자기 출력이 자기 입력에 섞이지 않는다. 이 엔진은 순서 대신 지연 평가로 값을 정하므로
