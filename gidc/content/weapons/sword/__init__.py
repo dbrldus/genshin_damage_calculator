@@ -5,3 +5,4 @@ from .rarity_5.azurelight import Azurelight
 from .rarity_4.favonius_sword import FavoniusSword
 from .rarity_4.calamity_of_eshu import CalamityOfEshu
 from .rarity_5.lightbearing_moonshard import LightbearingMoonshard
+from .rarity_5.athame_artis import AthameArtis
