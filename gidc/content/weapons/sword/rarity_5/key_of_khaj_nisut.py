@@ -51,10 +51,15 @@ class KeyOfKhajNisut(Weapon):
         )
 
     # ── 효과 2·3 — 착용자의 최종 HP 기반 (방식 B) ────────────────────────────
-    # HP → EM은 EM을 다시 재변환하는 효과가 아니라 HP에 비례한 몫을 그대로 얻는 효과라
-    # elemental_mastery에 직접 출력한다. 코어 정확성 가드는 ATK/DEF/HP 즉시 값 변경만
-    # 감시하고 EM은 대상이 아니다(party.py의 _CORE_POOL_FIELDS) — 대신 파티 멤버 순서
-    # 의존을 피하려고 값이 아니라 **읽는 함수**로 넘긴다(지연 기여).
+    # HP의 %에서 파생된 EM이므로 em_from_flat이 아니라 em_from_pct_share에 넣는다 —
+    # EM을 **다시 %로 변환**하는 버프(설탕 A4, 카즈하류, 적색 사막의 지팡이)가 이 지분을
+    # 재료로 쓰지 못하게 막는 꼬리표다. 콜롬비나 C2(HP% → 남의 EM)·이네파/산드로네
+    # A4(ATK% → EM)와 같은 자리다. 합계(elemental_mastery)에는 그대로 들어가므로 착용자
+    # 본인의 반응 피해와 EM 스케일 히트에는 정상적으로 실린다.
+    #
+    # 코어 정확성 가드는 ATK/DEF/HP 즉시 값 변경만 감시하고 EM은 대상이 아니다
+    # (party.py의 _CORE_POOL_FIELDS) — 대신 파티 멤버 순서 의존을 피하려고 값이 아니라
+    # **읽는 함수**로 넘긴다(지연 기여).
     def apply_passive_dependent(self, all_hits, wearer) -> None:
         if not self._stacks:
             return
@@ -66,7 +71,7 @@ class KeyOfKhajNisut(Weapon):
         # 효과 2: 스택당 착용자 자신의 EM. 제3자에게 뿌리지 않으므로 그냥 add.
         self_bonus = lambda: source_hit.current_hp() * self._SELF_EM_PCT[r] * self._stacks
         for hit in all_hits[wearer].values():
-            hit.add("em_from_flat", self_bonus, label, note="웅장한 시편")
+            hit.add("em_from_pct_share", self_bonus, label, note="웅장한 시편")
 
         # 효과 3: 3스택일 때 파티 전원(착용자 포함)의 EM. 제3자 대상이라 동명 무기 간
         # 비중첩 규약을 지키려면 apply_unique_buff로 제출한다.
@@ -75,7 +80,7 @@ class KeyOfKhajNisut(Weapon):
         party_bonus = lambda: source_hit.current_hp() * self._PARTY_EM_PCT[r]
         for char_hits in all_hits.values():
             for hit in char_hits.values():
-                hit.apply_unique_buff(label, "em_from_flat", party_bonus)
+                hit.apply_unique_buff(label, "em_from_pct_share", party_bonus)
 
     # ── 의도적 미구현 ─────────────────────────────────────────────────────
     # · 「웅장한 시편」 20초 지속과 0.3초 재발동 제한, 3스택 갱신 판정 — 스택이 몇 개
