@@ -14,6 +14,7 @@ from .polearm import (
     DragonsBane,
     FavoniusLance,
     LumidouceElegy,
+    CrimsonMoonsSemblance,
 )
 from .catalyst import (
     StarcallersWatch, CranesEchoingCall, FavoniusCodex, SacrificialFragments,
@@ -50,6 +51,7 @@ WEAPON_REGISTRY: dict[str, type[Weapon]] = {
     "용학살창":             DragonsBane,
     "페보니우스 장창":         FavoniusLance,
     "등방울꽃의 애가":         LumidouceElegy,
+    "붉은 달의 형상":         CrimsonMoonsSemblance,
 }
 
 

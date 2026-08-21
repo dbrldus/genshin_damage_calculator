@@ -8,3 +8,4 @@ from .rarity_5.bloodsoaked_ruins import BloodsoakedRuins
 from .rarity_4.dragons_bane import DragonsBane
 from .rarity_4.favonius_lance import FavoniusLance
 from .rarity_5.lumidouce_elegy import LumidouceElegy
+from .rarity_5.crimson_moons_semblance import CrimsonMoonsSemblance
