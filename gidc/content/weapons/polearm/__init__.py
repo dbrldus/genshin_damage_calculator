@@ -10,3 +10,4 @@ from .rarity_4.favonius_lance import FavoniusLance
 from .rarity_5.lumidouce_elegy import LumidouceElegy
 from .rarity_5.crimson_moons_semblance import CrimsonMoonsSemblance
 from .rarity_5.staff_of_the_scarlet_sands import StaffOfTheScarletSands
+from .rarity_5.calamity_queller import CalamityQueller
