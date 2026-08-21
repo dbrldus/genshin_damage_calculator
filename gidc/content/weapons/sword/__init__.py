@@ -11,3 +11,4 @@ from .rarity_5.uraku_misugiri import UrakuMisugiri
 from .rarity_5.splendor_of_tranquil_waters import SplendorOfTranquilWaters
 from .rarity_5.light_of_foliar_incision import LightOfFoliarIncision
 from .rarity_5.key_of_khaj_nisut import KeyOfKhajNisut
+from .rarity_5.haran_geppaku_futsu import HaranGeppakuFutsu

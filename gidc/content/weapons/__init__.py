@@ -13,6 +13,7 @@ from .sword import (
     SplendorOfTranquilWaters,
     LightOfFoliarIncision,
     KeyOfKhajNisut,
+    HaranGeppakuFutsu,
 )
 from .polearm import (
     ProspectorsShovel, Deathmatch, DialoguesOfTheDesertSages,
@@ -77,6 +78,7 @@ WEAPON_REGISTRY: dict[str, type[Weapon]] = {
     "고요히 샘솟는 빛":        SplendorOfTranquilWaters,
     "잎을 가르는 빛":         LightOfFoliarIncision,
     "성현의 열쇠":           KeyOfKhajNisut,
+    "하란 월백의 후츠":        HaranGeppakuFutsu,
 }
 
 
