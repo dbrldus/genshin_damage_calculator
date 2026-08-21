@@ -12,6 +12,7 @@ from .sword import (
     UrakuMisugiri,
     SplendorOfTranquilWaters,
     LightOfFoliarIncision,
+    KeyOfKhajNisut,
 )
 from .polearm import (
     ProspectorsShovel, Deathmatch, DialoguesOfTheDesertSages,
@@ -75,6 +76,7 @@ WEAPON_REGISTRY: dict[str, type[Weapon]] = {
     "우라쿠의 미스기리":        UrakuMisugiri,
     "고요히 샘솟는 빛":        SplendorOfTranquilWaters,
     "잎을 가르는 빛":         LightOfFoliarIncision,
+    "성현의 열쇠":           KeyOfKhajNisut,
 }
 
 
