@@ -10,6 +10,7 @@ from .sword import (
 from .polearm import (
     ProspectorsShovel, Deathmatch, DialoguesOfTheDesertSages,
     FracturedHalo, SymphonistOfScents, SkywardSpine,
+    BloodsoakedRuins,
 )
 from .catalyst import (
     StarcallersWatch, CranesEchoingCall, FavoniusCodex, SacrificialFragments,
@@ -42,6 +43,7 @@ WEAPON_REGISTRY: dict[str, type[Weapon]] = {
     "일곱빛 계시":           AngelosHeptades,
     "막간의 야상곡":          NocturnesCurtainCall,
     "빛나는 마음":           VividNotions,
+    "피로 물든 성":          BloodsoakedRuins,
 }
 
 
