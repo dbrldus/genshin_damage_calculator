@@ -30,7 +30,7 @@ def is_recording() -> bool:
 # 그 필드를 실제로 읽는 순간 계산한다(지연 평가). 등록 순서·파티 멤버 순서와 무관하게
 # 같은 결과가 나오고, 사슬이 몇 단이든 필요한 만큼 재귀로 풀린다.
 #
-#     hit.add("em_from_pct_share", lambda: ineffa_hit.current_atk() * 0.06, self)
+#     hit.add("em_from_pct_share", lambda: ineffa_hit.convertible_atk() * 0.06, self)
 #     hit.add("flat_dmg_bonus",    lambda: citlali_hit.elemental_mastery * 12, self)
 #
 # 순환(A가 B를 읽고 B가 A를 읽는 구조)은 값이 정해지지 않으므로 즉시 실패시킨다.
@@ -135,17 +135,27 @@ class SkillHit:
 
     # ── 고정 추가치 ──────────────────────────────────────────────────────────
     #region
+    # **직접 부여된** 고정 추가치만 여기 쌓인다 — 니콜 E(+300 등), 모험가 2세트(+1000 HP),
+    # 행운 2세트(+100 DEF)처럼 계수표의 상수로 적힌 값.
     hp_flat:  float = 0.0
     atk_flat: float = 0.0
     def_flat: float = 0.0
-    # 「공격력에서 파생된 공격력」 지분 (자기 참조 차단용 꼬리표).
-    # 최종 공격력에는 그대로 들어가지만(current_atk), 공격력을 읽어 **다시 공격력을 만드는**
-    # 버프의 재료에서는 빠진다(convertible_atk). 얀사 운동량 측정기가 자기 자신을 필드 위
-    # 캐릭터로 삼는 경우가 이쪽이다 — 같은 슬롯을 읽고 쓰면 값이 정해지지 않기 때문이다.
+
+    # 「다른 스탯의 %에서 파생된」 고정 추가치 지분 (유저 실측).
+    # 최종 스탯에는 그대로 들어가지만(current_hp/atk/def), 스탯을 읽어 버프를 만드는 쪽의
+    # **재료에서는 빠진다**(convertible_hp/atk/def). 게임이 버프 제공량을 계산할 때
+    # base*(1+pct) + flat 까지만 보고 이 지분은 세지 않는다.
+    #
+    # 여기 들어가는 것: 베넷 Q(자기 atk_base %), 반암결록·성현의 열쇠(HP %),
+    # 적색 사막의 지팡이(EM %), 콜롬비나 C2(HP % → ATK/DEF), 얀사 Q(ATK %).
+    #
     # 뺄셈이 아니라 **별도 필드**여야 한다: 재료 쪽이 atk_flat을 읽는 순간 자기 몫의
-    # 미결 지연 기여가 확정을 요구해 다시 순환이 된다. EM 쪽(em_from_flat /
-    # em_from_pct_share)도 같은 이유로 같은 모양이다.
+    # 미결 지연 기여가 확정을 요구해 순환이 된다. 얀사 운동량 측정기가 자기 자신을 필드
+    # 위 캐릭터로 삼는 경우가 그 자리다. EM 쪽(em_from_flat / em_from_pct_share)도 같은
+    # 이유로 같은 모양이다.
+    hp_from_pct_share:  float = 0.0
     atk_from_pct_share: float = 0.0
+    def_from_pct_share: float = 0.0
     #endregion
 
     # ── 전투 스탯 ────────────────────────────────────────────────────────────
@@ -347,12 +357,21 @@ class SkillHit:
     def_final: float = field(default=0.0, init=False)
 
     # ── 라이브 스탯 (finalize 타이밍과 무관하게 현재 누적값을 즉석 계산) ──────
-    # 방식 B 버프는 *_final 대신 이 헬퍼로 읽는다 — *_final은 Phase 6에서야 채워지는데
-    # 지연 기여는 그보다 앞선 Phase 5.5에 계산되기 때문이다. *_final은 히트 자신이
-    # 피해를 계산할 때 쓰는 값이고, 이쪽은 '지금까지 누적된 스탯'을 즉석에서 구한다.
-    def current_hp(self)  -> float: return self.hp_base  * (1.0 + self.hp_pct)  + self.hp_flat
-    def current_atk(self) -> float: return self.atk_base * (1.0 + self.atk_pct) + self.atk_flat + self.atk_from_pct_share
-    def current_def(self) -> float: return self.def_base * (1.0 + self.def_pct) + self.def_flat
+    # *_final은 Phase 6에서야 채워지는데 지연 기여는 그보다 앞선 Phase 5.5에 계산되므로,
+    # 방식 B 버프는 *_final 대신 이 헬퍼들로 읽는다.
+    #
+    # current_*  = 캐릭터가 실제로 들고 있는 스탯. **자기 피해를 계산할 때** 쓴다.
+    # convertible_* = 스탯을 읽어 버프를 만들 때의 **재료**. %-파생 지분을 뺀다.
+    #
+    # 둘을 가르는 근거는 유저 실측이다 — 게임이 버프 제공량을 계산할 때
+    # base*(1+pct) + flat 까지만 보고 *_from_pct_share 지분은 세지 않는다.
+    # 새 버프를 붙일 때 스탯을 읽는 쪽이면 거의 항상 convertible_*가 맞다.
+    def current_hp(self)  -> float: return self.convertible_hp()  + self.hp_from_pct_share
+    def current_atk(self) -> float: return self.convertible_atk() + self.atk_from_pct_share
+    def current_def(self) -> float: return self.convertible_def() + self.def_from_pct_share
+
+    def convertible_hp(self)  -> float: return self.hp_base  * (1.0 + self.hp_pct)  + self.hp_flat
+    def convertible_def(self) -> float: return self.def_base * (1.0 + self.def_pct) + self.def_flat
 
     @property
     def elemental_mastery(self) -> float:
@@ -372,20 +391,22 @@ class SkillHit:
         return self.em_from_flat + self.em_from_pct_share
 
     def convertible_atk(self) -> float:
-        """**공격력 → 공격력** 변환 버프만 읽는 공격력. 파생 지분(atk_from_pct_share)은 뺀다.
+        """공격력을 읽어 **버프를 만들 때** 쓰는 재료 공격력. 파생 지분은 뺀다.
 
-        게임의 스탯은 수정자를 순서대로 접은 결과라 i번째 수정자가 i-1까지의 값만 보고,
-        자기 출력이 자기 입력에 섞이지 않는다. 이 엔진은 순서 대신 지연 평가로 값을 정하므로
-        (party.py 첫머리) 같은 슬롯을 읽고 쓰면 해가 없는 순환이 된다 — 그 자리를 이 접근자가
-        대신한다. 얀사 운동량 측정기(자기 공격력 27% → 필드 위 캐릭터의 공격력)가 유일한 소비처다.
+        유저 실측: 게임은 버프 제공량을 base*(1+pct) + flat 까지로 계산하고
+        atk_from_pct_share(베넷 Q·반암결록·적색 사막의 지팡이·콜롬비나 C2·얀사 Q처럼
+        다른 스탯의 %에서 파생된 고정 추가치)는 재료로 세지 않는다. 그래서 스탯을 읽는
+        버프는 **전부** 이쪽을 읽는다 — 마비카·한운·이네파·산드로네·제사의 여운 등.
 
-        공격력을 읽어 **다른** 필드에 쓰는 버프(마비카·한운·제사의 여운 등)는 순환이 아니므로
-        current_atk()를 그대로 읽는다 — 실제로 들고 있는 공격력은 출처와 무관하게 전부 재료다.
-        em_from_flat이 %-재변환만 막고 EM→피해는 막지 않는 것과 같은 규약이다.
+        자기 피해를 계산할 때 쓰는 값은 current_atk()다(파생 지분 포함). 재료와 실제
+        보유량이 갈리는 자리라 둘을 섞으면 안 된다.
 
-        변환기가 둘 이상이면 서로의 파생 지분을 못 본다. 게임은 순서대로라면 뒤쪽이 앞쪽을
-        볼 테니 근사이지만, 순서 독립성을 지키려면 이쪽이 맞다(em_from_pct_share와 같은 교환).
-        현재 이 계열은 얀사 하나뿐이라 실제로 갈라지는 조합이 없다.
+        부수적으로 자기 참조 순환도 이 접근자가 막는다 — 얀사 운동량 측정기는 자기
+        공격력을 읽어 필드 위 캐릭터(자기 자신일 수 있다)의 atk_from_pct_share에 쓴다.
+        같은 슬롯을 읽고 쓰면 값이 정해지지 않는데, 재료와 출력이 다른 필드라 끊긴다.
+
+        변환기가 둘 이상이면 서로의 파생 지분을 못 본다. 순서 독립성을 지키려는 교환이며
+        em_from_pct_share와 같은 규약이다.
         """
         return self.atk_base * (1.0 + self.atk_pct) + self.atk_flat
 

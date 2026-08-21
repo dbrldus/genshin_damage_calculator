@@ -198,9 +198,9 @@ class Columbina(Character):
     # EM은 '다른 캐릭터 스탯의 %'로 주는 지분이라 변환 재료가 되지 않는 조각에 넣는다
     # (합계 elemental_mastery에는 자동으로 포함된다 — profile.SkillHit 참고).
     _C2_FULLMOON_CONVERSION = (
-        ("atk_flat",          0.0100),   # 달 감전 → 공격력
+        ("atk_from_pct_share", 0.0100),  # 달 감전 → 공격력
         ("em_from_pct_share", 0.0035),   # 달 개화 → 원소 마스터리
-        ("def_flat",          0.0100),   # 달 결정 → 방어력
+        ("def_from_pct_share", 0.0100),  # 달 결정 → 방어력
     )
 
     # C4 : 이번 간섭파의 달빛 반응 피해가 콜롬비나 HP 최대치의 12.5%/2.5%/12.5%만큼 증가
@@ -337,7 +337,7 @@ class Columbina(Character):
             if moonsign_level(all_hits) is MoonsignLevel.FULL:
                 source_hit = next(iter(all_hits[self].values()))
                 field_name, ratio = self._C2_FULLMOON_CONVERSION[self._interference]
-                value = lambda: source_hit.current_hp() * ratio
+                value = lambda: source_hit.convertible_hp() * ratio
                 for hit in all_hits[self._on_field].values():
                     # 대상 필드가 이미 '재변환 재료에서 빠지는' 조각을 가리킨다
                     # (_C2_FULLMOON_CONVERSION) — 따로 태그할 필요가 없다.
@@ -411,7 +411,7 @@ class Columbina(Character):
         # 반응별 필드로 나뉘어 있으므로 세 자리에 모두 넣는다 — Q 「향수에 잠긴 달」이 반응
         # 보너스를 셋에 넣는 것과 같다. 달감전에만 거는 이네파 Moonsign과 갈리는 자리다.
         moonsign_base = lambda: min(
-            source_hit.current_hp() / 1000.0 * self._MOONSIGN_BASE_DMG_PER_1000_HP,
+            source_hit.convertible_hp() / 1000.0 * self._MOONSIGN_BASE_DMG_PER_1000_HP,
             self._MOONSIGN_BASE_DMG_CAP,
         )
         for char_hits in all_hits.values():
@@ -426,7 +426,7 @@ class Columbina(Character):
             ratio = self._C4_INTERFERENCE_HP_RATIO[self._interference]
             for hit in self._interference_hits(all_hits[self]):
                 hit.add("flat_dmg_bonus",
-                        lambda: source_hit.current_hp() * ratio,
+                        lambda: source_hit.convertible_hp() * ratio,
                         self, note="C4 간섭파")
 
     def _interference_hits(self, hits: dict[str, SkillHit]):

@@ -52,7 +52,7 @@ class StaffOfTheScarletSands(Weapon):
 
         base_bonus = lambda: source_hit.em_from_flat * self._BASE_EM_ATK_PCT[r]
         for hit in all_hits[wearer].values():
-            hit.add("atk_flat", base_bonus, label, note="신기루 끝의 뜨거운 꿈")
+            hit.add("atk_from_pct_share", base_bonus, label, note="신기루 끝의 뜨거운 꿈")
 
         if not self._stacks:
             return
@@ -60,7 +60,7 @@ class StaffOfTheScarletSands(Weapon):
             lambda: source_hit.em_from_flat * self._STACK_EM_ATK_PCT[r] * self._stacks
         )
         for hit in all_hits[wearer].values():
-            hit.add("atk_flat", stack_bonus, label, note="적색 사막의 꿈")
+            hit.add("atk_from_pct_share", stack_bonus, label, note="적색 사막의 꿈")
 
     # ── 의도적 미구현 ─────────────────────────────────────────────────────
     # · 「적색 사막의 꿈」 10초 지속과 스택 갱신 판정 — 스택이 몇 개 실려 있는지만

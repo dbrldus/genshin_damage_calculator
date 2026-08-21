@@ -43,7 +43,7 @@ class PeakPatrolSong(Weapon):
 
     # 효과 2: 2스택 시 장착자 최종 방어력 기반 파티 원소 피해 보너스 — 방식 B(최종 스탯
     # 기반)이므로 모든 코어 DEF 기여(자기 버프 + 크로스 캐릭터)가 끝난 뒤인 Phase 5에서
-    # current_def()를 읽는다.
+    # convertible_def()를 읽는다.
     # 동명의 무기 효과는 중첩되지 않는다 — 여러 명이 착용하면 방어력이 가장 높은 쪽의
     # 보너스만 남도록 비중첩으로 제출한다(무기 클래스가 「동명」 판정 키).
     def apply_passive_dependent(self, all_hits, wearer) -> None:
@@ -54,7 +54,7 @@ class PeakPatrolSong(Weapon):
         # 필요한데, 그 비교는 후보들의 값이 다 나온 뒤(확정 시점)에 이뤄진다.
         source_hit = next(iter(all_hits[wearer].values()))
         party_bonus = lambda: min(
-            (source_hit.current_def() / 1000.0) * self._PARTY_ELEM_PER_1000[r],
+            (source_hit.convertible_def() / 1000.0) * self._PARTY_ELEM_PER_1000[r],
             self._PARTY_ELEM_CAP[r],
         )
         for char_hits in all_hits.values():

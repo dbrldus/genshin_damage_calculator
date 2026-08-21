@@ -40,7 +40,11 @@ _STAT_TRIPLES = [("공격력", "atk"), ("HP", "hp"), ("방어력", "def")]
 # 화면의 「공격력 = base × (1+pct) + flat」 줄이 atk_final과 어긋나지 않는다.
 # atk_from_pct_share는 「공격력에서 파생된 공격력」 꼬리표다 — 최종 공격력에는 들어가되
 # 공격력→공격력 변환의 재료에서만 빠진다(profile.convertible_atk 참고).
-_EXTRA_FLAT_FIELDS: dict[str, tuple[str, ...]] = {"atk": ("atk_from_pct_share",)}
+_EXTRA_FLAT_FIELDS: dict[str, tuple[str, ...]] = {
+    "hp":  ("hp_from_pct_share",),
+    "atk": ("atk_from_pct_share",),
+    "def": ("def_from_pct_share",),
+}
 
 _DMG_POOL_FIELDS = [
     "pyro_dmg_bonus", "hydro_dmg_bonus", "cryo_dmg_bonus", "electro_dmg_bonus",

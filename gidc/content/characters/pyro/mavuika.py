@@ -414,7 +414,7 @@ class Mavuika(Character):
         # 순간 그때까지의 모든 기여가 확정된 뒤 계산된다.
         # (ATK 코어 풀에 되먹이면 무한 루프이며 정확성 가드가 실패시킨다 → flat_dmg_bonus.)
         source_hit = next(iter(hits.values()))
-        atk = lambda: source_hit.current_atk()
+        atk = lambda: source_hit.convertible_atk()
 
         # ── Q 「삶과 죽음의 용광로」 ────────────────────────────────────────────
         # 발동 순간의 전의 1pt당 공격력의 N%만큼 석양 베기 / 바이크 일반 공격 / 바이크

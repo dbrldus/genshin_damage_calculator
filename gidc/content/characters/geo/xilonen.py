@@ -205,7 +205,7 @@ class Xilonen(Character):
             for hit in hits.values():
                 if hit.skill_type in (SkillType.NORMAL_ATK, SkillType.PLUNGING):
                     hit.add("flat_dmg_bonus",
-                            lambda: source_hit.current_def() * 3.0,
+                            lambda: source_hit.convertible_def() * 3.0,
                             self, note="C6 영원한 밤 축복")
 
     # ── Phase 4: C2 코어 스탯(atk_pct/hp_pct) 기여 + C4 입력 수집 ──────────────
@@ -286,5 +286,5 @@ class Xilonen(Character):
             for hit in char_hits.values():
                 if hit.skill_type in (SkillType.NORMAL_ATK, SkillType.CHARGED_ATK, SkillType.PLUNGING):
                     hit.add("flat_dmg_bonus",
-                            lambda: source_hit.current_def() * 0.65,
+                            lambda: source_hit.convertible_def() * 0.65,
                             self, note="C4 영광의 꽃")

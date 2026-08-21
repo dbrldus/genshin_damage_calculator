@@ -114,7 +114,9 @@ class Party:
 # 방식 B=Flat DMG 변환). 반면 EM은 꼬리표(em_from_pct_share) 달린 Flat으로 출력될 수 있으므로
 # (설탕·나히다) 감시 대상에서 제외한다.
 _CORE_POOL_FIELDS = (
-    "hp_flat", "hp_pct", "atk_flat", "atk_from_pct_share", "atk_pct", "def_flat", "def_pct",
+    "hp_flat", "hp_pct", "hp_from_pct_share",
+    "atk_flat", "atk_pct", "atk_from_pct_share",
+    "def_flat", "def_pct", "def_from_pct_share",
 )
 
 
@@ -238,16 +240,19 @@ _FULL_MOON_LUNAR_FIELDS = ("lunar_charged_bonus", "lunar_bloom_bonus", "lunar_cr
 
 
 def _full_moon_buffer_bonus(hit: SkillHit, element: Element) -> float:
-    """비-달빛징조 버퍼 한 명이 자신의 원소별 스탯으로 만드는 달빛 반응 피해 증가(캡 전)."""
+    """비-달빛징조 버퍼 한 명이 자신의 원소별 스탯으로 만드는 달빛 반응 피해 증가(캡 전).
+
+    네 스탯 전부 **재료 접근자**로 읽는다 — 버프 제공량 계산이므로 다른 스탯의 %에서
+    파생된 지분(*_from_pct_share)은 세지 않는다(profile.SkillHit의 고정 추가치 주석).
+    """
     if element in (Element.PYRO, Element.ELECTRO, Element.CRYO):
-        return (hit.current_atk() / 100.0) * 0.009    # 공격력 100pt당 0.9%
+        return (hit.convertible_atk() / 100.0) * 0.009   # 공격력 100pt당 0.9%
     if element == Element.HYDRO:
-        return (hit.current_hp() / 1000.0) * 0.006     # HP 최대치 1000pt당 0.6%
+        return (hit.convertible_hp() / 1000.0) * 0.006   # HP 최대치 1000pt당 0.6%
     if element == Element.GEO:
-        return (hit.current_def() / 100.0) * 0.01      # 방어력 100pt당 1%
+        return (hit.convertible_def() / 100.0) * 0.01    # 방어력 100pt당 1%
     if element in (Element.ANEMO, Element.DENDRO):
-        # EM→피해 변환이므로 꼬리표 달린 지분(설탕 등)은 재료에서 제외한다.
-        return (hit.em_from_flat / 100.0) * 0.0225  # 원소 마스터리 100pt당 2.25%
+        return (hit.em_from_flat / 100.0) * 0.0225       # 원소 마스터리 100pt당 2.25%
     return 0.0
 
 

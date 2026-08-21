@@ -69,7 +69,7 @@ class KeyOfKhajNisut(Weapon):
         source_hit = next(iter(all_hits[wearer].values()))
 
         # 효과 2: 스택당 착용자 자신의 EM. 제3자에게 뿌리지 않으므로 그냥 add.
-        self_bonus = lambda: source_hit.current_hp() * self._SELF_EM_PCT[r] * self._stacks
+        self_bonus = lambda: source_hit.convertible_hp() * self._SELF_EM_PCT[r] * self._stacks
         for hit in all_hits[wearer].values():
             hit.add("em_from_pct_share", self_bonus, label, note="웅장한 시편")
 
@@ -77,7 +77,7 @@ class KeyOfKhajNisut(Weapon):
         # 비중첩 규약을 지키려면 apply_unique_buff로 제출한다.
         if self._stacks < self._MAX_STACKS:
             return
-        party_bonus = lambda: source_hit.current_hp() * self._PARTY_EM_PCT[r]
+        party_bonus = lambda: source_hit.convertible_hp() * self._PARTY_EM_PCT[r]
         for char_hits in all_hits.values():
             for hit in char_hits.values():
                 hit.apply_unique_buff(label, "em_from_pct_share", party_bonus)

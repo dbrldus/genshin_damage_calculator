@@ -143,9 +143,13 @@ class Bennett(Character):
             self_hits = all_hits[self]
             first = next(iter(self_hits.values()))
             flat_atk = first.atk_base * ratio
+            # 베넷 기초 공격력의 %에서 파생된 값이라 atk_flat이 아니라 atk_from_pct_share다
+            # (유저 실측). 받는 캐릭터의 최종 공격력에는 그대로 들어가지만, 그 캐릭터의
+            # 공격력을 읽어 버프를 만드는 쪽(마비카·이네파·제사의 여운 등)의 재료에서는
+            # 빠진다. 니콜 E처럼 계수표의 상수로 적힌 값만 atk_flat에 남는다.
             for char_hits in all_hits.values():
                 for hit in char_hits.values():
-                    hit.add("atk_flat", flat_atk, self, note="Q 아름다운 여정")
+                    hit.add("atk_from_pct_share", flat_atk, self, note="Q 아름다운 여정")
 
     # C6: pyro_dmg_bonus는 코어 스탯도 스탯 스케일도 아니므로 apply_party_buffs.
     def apply_party_buffs(self, all_hits: dict["Character", dict[str, SkillHit]]) -> None:

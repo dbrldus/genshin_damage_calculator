@@ -287,7 +287,7 @@ class Xianyun(Character):
         # 공격력 버프뿐 아니라 다른 파티원이 같은 단계에서 얹어 줄 수도 있어, 여기서
         # 확정하면 파티 멤버 순서가 결과를 바꾼다. 상한도 읽는 순간에 걸린다.
         source_hit = next(iter(all_hits[self].values()))
-        flat = lambda: min(source_hit.current_atk() * per_atk, cap)
+        flat = lambda: min(source_hit.convertible_atk() * per_atk, cap)
 
         # ① 고른 필드 위 캐릭터의 추락 충격 — 원문 그대로.
         for hit in all_hits[self._on_field].values():

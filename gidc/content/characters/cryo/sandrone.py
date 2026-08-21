@@ -416,7 +416,7 @@ class Sandrone(Character):
         # 같은 단계에서 다른 캐릭터가 그의 공격력을 올릴 수 있으므로 지금 확정하면
         # 파티 멤버 순서가 결과를 바꾼다. 항상 같은 히트(첫 히트)를 읽어 값이 흔들리지 않는다.
         source_hit = next(iter(all_hits[self].values()))
-        atk_per_100 = lambda: source_hit.current_atk() / 100.0
+        atk_per_100 = lambda: source_hit.convertible_atk() / 100.0
 
         # Stellar 별빛 축복: 별 초전도·별 확산 '기본 피해' 증가 — 파티 전원에게 적용된다.
         # 이네파 Moonsign과 같은 모양이고, 반응 계열만 별 쪽으로 갈린다. 콜롬비나가 달반응

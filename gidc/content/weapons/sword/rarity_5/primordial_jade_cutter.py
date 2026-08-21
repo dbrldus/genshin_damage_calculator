@@ -40,6 +40,6 @@ class PrimordialJadeCutter(Weapon):
         label = "무기: 반암결록"
 
         source_hit = next(iter(all_hits[wearer].values()))
-        bonus = lambda: source_hit.current_hp() * self._ATK_HP_PCT[r]
+        bonus = lambda: source_hit.convertible_hp() * self._ATK_HP_PCT[r]
         for hit in all_hits[wearer].values():
-            hit.add("atk_flat", bonus, label, note="수호자의 무구한 마음")
+            hit.add("atk_from_pct_share", bonus, label, note="수호자의 무구한 마음")

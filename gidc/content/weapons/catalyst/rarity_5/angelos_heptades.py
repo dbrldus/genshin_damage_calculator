@@ -81,7 +81,7 @@ class AngelosHeptades(Weapon):
         # 「1000pt마다」는 바위산을 맴도는 노래와 같이 연속으로 본다(계단이 아니다).
         source_hit = next(iter(all_hits[wearer].values()))
         full = lambda: min(
-            (source_hit.current_atk() / 1000.0) * self._LIGHT_PER_1K[r],
+            (source_hit.convertible_atk() / 1000.0) * self._LIGHT_PER_1K[r],
             self._LIGHT_CAP[r],
         )
 

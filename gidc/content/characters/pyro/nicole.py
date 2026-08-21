@@ -210,7 +210,7 @@ class Nicole(Character):
         # Hexerei: 마도·비밀 의식(니콜 본인이 마도 + 2명 이상) — 비밀 환영 피해 + Nicole ATK 300%
         if hexerei_rite_for(self, all_hits):
             all_hits[self]["비밀 환영 비전 피해"].add(
-                "flat_dmg_bonus", lambda: source_hit.current_atk() * 3.0,
+                "flat_dmg_bonus", lambda: source_hit.convertible_atk() * 3.0,
                 self, note="마도·비밀 의식")
 
         if not self._e_active or c < 4:
@@ -222,5 +222,5 @@ class Nicole(Character):
                 continue
             for hit in char_hits.values():
                 hit.add("flat_dmg_bonus",
-                        lambda: source_hit.current_atk() * 0.70,
+                        lambda: source_hit.convertible_atk() * 0.70,
                         self, note="C4 인도자의 가호")

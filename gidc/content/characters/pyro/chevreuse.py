@@ -321,7 +321,7 @@ class Chevreuse(Character):
         source_hit = next(iter(all_hits[self].values()))
 
         def atk_bonus() -> float:
-            raw = (source_hit.current_hp() / self._A4_HP_UNIT) * self._A4_ATK_PER_UNIT
+            raw = (source_hit.convertible_hp() / self._A4_HP_UNIT) * self._A4_ATK_PER_UNIT
             return min(raw, self._A4_ATK_CAP)
 
         for char, char_hits in all_hits.items():

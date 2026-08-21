@@ -36,5 +36,5 @@ class EchoesOfAnOffering(Artifact):
             # 값이 아니라 **읽는 함수**로 넘긴다 — 장비 패시브는 캐릭터 버프와 같은
             # 단계에서 교차 실행되므로 지금 읽으면 뒤에 오는 공격력 버프를 놓친다.
             hit.add("flat_dmg_bonus",
-                    lambda h=hit: h.current_atk() * 0.70,
+                    lambda h=hit: h.convertible_atk() * 0.70,
                     (self.artifact_set, 4))

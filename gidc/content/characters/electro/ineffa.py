@@ -233,7 +233,7 @@ class Ineffa(Character):
         # 여기서 값을 미리 확정해 버리면 누가 먼저 실행되느냐가 결과를 바꾼다.
         # 항상 같은 히트(첫 히트)를 읽으므로 언제 계산되든 값은 같다.
         source_hit = next(iter(all_hits[self].values()))
-        atk_per_100 = lambda: source_hit.current_atk() / 100.0
+        atk_per_100 = lambda: source_hit.convertible_atk() / 100.0
 
         # Moonsign: 달감전 '기본 피해' 증가 — 파티 전원의 달감전에 적용된다.
         # 원문대로 **달감전에만** 걸린다. 콜롬비나 Moonsign이 달빛 반응 3종에 거는 것과
@@ -269,7 +269,7 @@ class Ineffa(Character):
         # 이네파가 적색 사막의 지팡이(EM→공격력)를 직접 들면 재료 쪽이 합계를 읽느라
         # 이 기여를 확정시켜 CyclicBuffError가 났다. 값으로는 정확히 상쇄되는데도.
         if self._burst_used:
-            em = lambda: source_hit.current_atk() * self._A4_EM_FROM_ATK
+            em = lambda: source_hit.convertible_atk() * self._A4_EM_FROM_ATK
             targets = {id(self): self}
             if self._on_field is not None:
                 targets[id(self._on_field)] = self._on_field

@@ -263,5 +263,5 @@ class Escoffier(Character):
             for hit in char_hits.values():
                 if hit.element is Element.CRYO:
                     hit.add("flat_dmg_bonus",
-                            lambda: source_hit.current_atk() * self._C2_COLD_DISH_DMG,
+                            lambda: source_hit.convertible_atk() * self._C2_COLD_DISH_DMG,
                             self, note="C2 냉요리")

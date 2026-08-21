@@ -33,7 +33,7 @@ class RedhornStonethresher(Weapon):
 
     # 효과 2: 일반/강공격 피해량이 착용자 최종 방어력의 X%만큼 증가 — 방식 B(최종 스탯
     # 기반)이므로 효과 1을 포함한 모든 코어 DEF 기여가 끝난 뒤인 Phase 5에서
-    # current_def()를 읽는다. 착용자 자신의 일반/강공격 히트에만 붙으므로 add로 제출한다
+    # convertible_def()를 읽는다. 착용자 자신의 일반/강공격 히트에만 붙으므로 add로 제출한다
     # (파티·제3자로 뿌리는 효과가 아니라 apply_unique_buff 대상이 아니다).
     def apply_passive_dependent(self, all_hits, wearer) -> None:
         r     = self.refinement - 1
@@ -44,7 +44,7 @@ class RedhornStonethresher(Weapon):
         for hit in wearer_hits.values():
             if hit.skill_type not in (SkillType.NORMAL_ATK, SkillType.CHARGED_ATK):
                 continue
-            hit.add("flat_dmg_bonus", lambda: source_hit.current_def() * self._NA_CA_DEF_SCALE[r], label)
+            hit.add("flat_dmg_bonus", lambda: source_hit.convertible_def() * self._NA_CA_DEF_SCALE[r], label)
 
     # ── 의도적 미구현 ─────────────────────────────────────────────────────────
     # (없음 — 문구 전체가 히트 단가에 반영된다)
