@@ -17,3 +17,4 @@ from .rarity_5.kagura_s_verity import KaguraSVerity
 from .rarity_5.everlasting_moonglow import EverlastingMoonglow
 from .rarity_5.memory_of_dust import MemoryOfDust
 from .rarity_5.lost_prayer_to_the_sacred_winds import LostPrayerToTheSacredWinds
+from .rarity_5.skyward_atlas import SkywardAtlas
