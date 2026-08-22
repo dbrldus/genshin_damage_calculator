@@ -395,6 +395,13 @@
   "불멸·듀란달": "UI_EquipIcon_Claymore_VarkaTunkeldegen"
  },
  "artifacts": {
+  "핏빛 증표": {
+   "꽃": "UI_RelicIcon_15047_4",
+   "깃털": "UI_RelicIcon_15047_2",
+   "시계": "UI_RelicIcon_15047_5",
+   "성배": "UI_RelicIcon_15047_1",
+   "왕관": "UI_RelicIcon_15047_3"
+  },
   "그림자 속 산산조각 난 꿈": {
    "꽃": "UI_RelicIcon_15046_4",
    "깃털": "UI_RelicIcon_15046_2",

@@ -4,6 +4,7 @@ from gidc.enums import ArtifactSet, ArtifactSlot, StatType
 from ._default import DefaultArtifact
 
 # ── 4~5성 세트 (최신순) ───────────────────────────────────────────────────────
+from .scarlet_proof import ScarletProof
 from .disenchantment_in_deep_shadow import DisenchantmentInDeepShadow
 from .celestial_gift import CelestialGift
 from .a_day_carved_from_rising_winds import ADayCarvedFromRisingWinds
@@ -74,6 +75,7 @@ from .adventurer import Adventurer
 
 ARTIFACT_REGISTRY: dict[ArtifactSet, type[Artifact]] = {
     # ── 4~5성 세트 (최신순) ───────────────────────────────────────────────────
+    ArtifactSet.SCARLET_PROOF:                           ScarletProof,
     ArtifactSet.DISENCHANTMENT_IN_DEEP_SHADOW:           DisenchantmentInDeepShadow,
     ArtifactSet.CELESTIAL_GIFT:                          CelestialGift,
     ArtifactSet.A_DAY_CARVED_FROM_RISING_WINDS:          ADayCarvedFromRisingWinds,

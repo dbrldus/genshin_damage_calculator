@@ -98,6 +98,7 @@ class DmgType(Enum):
 
 class ArtifactSet(Enum):
     # ── 5성 세트 (최신순) ──────────────────────────────────────────
+    SCARLET_PROOF                           = "핏빛 증표"
     DISENCHANTMENT_IN_DEEP_SHADOW           = "그림자 속 산산조각 난 꿈"
     CELESTIAL_GIFT                          = "하늘의 은총"
     A_DAY_CARVED_FROM_RISING_WINDS          = "바람이 시작되는 날"
