@@ -41,6 +41,7 @@ from .catalyst import (
     NocturnesCurtainCall,
     VividNotions,
     NewYearsMorningHibernation,
+    SurfSUp,
 )
 
 WEAPON_REGISTRY: dict[str, type[Weapon]] = {
@@ -99,6 +100,7 @@ WEAPON_REGISTRY: dict[str, type[Weapon]] = {
     "호마의 지팡이":          StaffOfHoma,
     "관홍의 창":            VortexVanquisher,
     "화박연":              PrimordialJadeWingedSpear,
+    "서핑 타임":               SurfSUp,
 }
 
 

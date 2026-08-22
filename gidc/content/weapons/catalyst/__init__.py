@@ -7,3 +7,4 @@ from .rarity_5.angelos_heptades import AngelosHeptades
 from .rarity_5.nocturnes_curtain_call import NocturnesCurtainCall
 from .rarity_5.vivid_notions import VividNotions
 from .rarity_5.new_years_morning_hibernation import NewYearsMorningHibernation
+from .rarity_5.surf_s_up import SurfSUp
