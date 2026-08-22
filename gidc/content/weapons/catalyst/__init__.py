@@ -9,3 +9,4 @@ from .rarity_5.vivid_notions import VividNotions
 from .rarity_5.new_years_morning_hibernation import NewYearsMorningHibernation
 from .rarity_5.surf_s_up import SurfSUp
 from .rarity_5.cashflow_supervision import CashflowSupervision
+from .rarity_5.tome_of_the_eternal_flow import TomeOfTheEternalFlow
