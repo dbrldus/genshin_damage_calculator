@@ -15,3 +15,4 @@ from .rarity_5.tulaytullah_s_remembrance import TulaytullahSRemembrance
 from .rarity_5.a_thousand_floating_dreams import AThousandFloatingDreams
 from .rarity_5.kagura_s_verity import KaguraSVerity
 from .rarity_5.everlasting_moonglow import EverlastingMoonglow
+from .rarity_5.memory_of_dust import MemoryOfDust

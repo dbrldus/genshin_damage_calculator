@@ -49,6 +49,7 @@ from .catalyst import (
     AThousandFloatingDreams,
     KaguraSVerity,
     EverlastingMoonglow,
+    MemoryOfDust,
 )
 
 WEAPON_REGISTRY: dict[str, type[Weapon]] = {
@@ -115,6 +116,7 @@ WEAPON_REGISTRY: dict[str, type[Weapon]] = {
     "떠오르는 천일 밤의 꿈":        AThousandFloatingDreams,
     "카구라의 진의":             KaguraSVerity,
     "불멸의 달빛":              EverlastingMoonglow,
+    "속세의 자물쇠":             MemoryOfDust,
 }
 
 

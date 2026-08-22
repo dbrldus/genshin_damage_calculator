@@ -4,8 +4,8 @@ from gidc.enums import StatType
 from gidc.prompt import ask_bool, ask_int
 
 
-class TheUnforged(Weapon):
-    """무공의 검 (The Unforged) | 양손검 | 5성
+class MemoryOfDust(Weapon):
+    """속세의 자물쇠 (Memory of Dust) | 법구 | 5성
     패시브: 금빛의 옥 · 제군의 길
     - 보호막 강화 효과가 20/25/30/35/40% 증가한다.
     - 공격 명중 후 공격력이 4/5/6/7/8% 증가한다. 지속 시간: 8초. 최대 중첩수: 5회. 해당 효과는
@@ -16,7 +16,7 @@ class TheUnforged(Weapon):
 
     def __init__(self, refinement: int) -> None:
         super().__init__(
-            weapon_type   = WeaponType.CLAYMORE,
+            weapon_type   = WeaponType.CATALYST,
             rarity        = 5,
             tier          = 2,
             refinement    = refinement,
@@ -25,13 +25,13 @@ class TheUnforged(Weapon):
 
     def apply_passive(self, all_hits, wearer) -> None:
         r     = self.refinement - 1
-        label = "무기: 무공의 검"
+        label = "무기: 속세의 자물쇠"
 
         # 「금빛의 옥」 스택. 트리거(공격 명중, 0.3초당 최대 1회)는 하나뿐이라 스택 수만
-        # 묻는다 — 참봉의 칼날·관홍의 창·속세의 자물쇠(같은 패시브의 검·장병기·법구
-        # 버전)와 같은 꼴.
+        # 묻는다 — 참봉의 칼날·관홍의 창·무공의 검(같은 패시브의 검·장병기·양손검 버전)과
+        # 같은 꼴.
         stacks = ask_int(
-            "[무공의 검] 「금빛의 옥」 스택 수 (공격 명중 시 획득, 0.3초당 최대 1회, 최대 5)",
+            "[속세의 자물쇠] 「금빛의 옥」 스택 수 (공격 명중 시 획득, 0.3초당 최대 1회, 최대 5)",
             0, 5,
         )
         if not stacks:
@@ -39,7 +39,7 @@ class TheUnforged(Weapon):
 
         # 보호막 존재 시 스택당 공격력 증가 효과가 100% 증가(2배) — 파티 구성이 아니라
         # 로테이션이 정하는 상태라 묻는다.
-        multiplier = 2.0 if ask_bool("[무공의 검] 보호막 존재 여부 (「금빛의 옥」 공격력 증가 2배)") else 1.0
+        multiplier = 2.0 if ask_bool("[속세의 자물쇠] 보호막 존재 여부 (「금빛의 옥」 공격력 증가 2배)") else 1.0
 
         for hit in all_hits[wearer].values():
             hit.add("atk_pct", stacks * self._ATK_PER_STACK[r] * multiplier, label, note="금빛의 옥 스택")
