@@ -8,3 +8,4 @@ from .rarity_5.nocturnes_curtain_call import NocturnesCurtainCall
 from .rarity_5.vivid_notions import VividNotions
 from .rarity_5.new_years_morning_hibernation import NewYearsMorningHibernation
 from .rarity_5.surf_s_up import SurfSUp
+from .rarity_5.cashflow_supervision import CashflowSupervision

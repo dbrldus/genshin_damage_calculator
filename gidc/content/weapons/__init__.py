@@ -42,6 +42,7 @@ from .catalyst import (
     VividNotions,
     NewYearsMorningHibernation,
     SurfSUp,
+    CashflowSupervision,
 )
 
 WEAPON_REGISTRY: dict[str, type[Weapon]] = {
@@ -101,6 +102,7 @@ WEAPON_REGISTRY: dict[str, type[Weapon]] = {
     "관홍의 창":            VortexVanquisher,
     "화박연":              PrimordialJadeWingedSpear,
     "서핑 타임":               SurfSUp,
+    "현금 흐름 감독":            CashflowSupervision,
 }
 
 
