@@ -19,3 +19,4 @@ from .rarity_5.memory_of_dust import MemoryOfDust
 from .rarity_5.lost_prayer_to_the_sacred_winds import LostPrayerToTheSacredWinds
 from .rarity_5.skyward_atlas import SkywardAtlas
 from .rarity_5.nightweaver_s_looking_glass import NightweaverSLookingGlass
+from .rarity_5.reliquary_of_truth import ReliquaryOfTruth

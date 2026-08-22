@@ -53,6 +53,7 @@ from .catalyst import (
     LostPrayerToTheSacredWinds,
     SkywardAtlas,
     NightweaverSLookingGlass,
+    ReliquaryOfTruth,
 )
 
 WEAPON_REGISTRY: dict[str, type[Weapon]] = {
@@ -123,6 +124,7 @@ WEAPON_REGISTRY: dict[str, type[Weapon]] = {
     "사풍 원서":               LostPrayerToTheSacredWinds,
     "천공의 두루마리":            SkywardAtlas,
     "밤을 엮는 거울":            NightweaverSLookingGlass,
+    "진실의 함":               ReliquaryOfTruth,
 }
 
 
