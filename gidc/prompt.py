@@ -27,11 +27,12 @@ from dataclasses import dataclass
 class Question:
     """UI가 위젯 하나를 그리는 데 필요한 전부."""
     id:      str
-    kind:    str                      # bool | int | choice | multi
+    kind:    str                      # bool | int | choice | multi | step
     prompt:  str
     options: tuple[str, ...] = ()
-    min_val: int = 0
-    max_val: int = 999
+    min_val: float = 0
+    max_val: float = 999
+    step:    float = 1               # step 전용 — 값이 오르내리는 간격
     owner:   str = ""                 # 이 질문을 낳은 장비의 착용자 (asking_for 참고)
 
     @property
@@ -57,6 +58,7 @@ class Question:
         return {
             "id": self.id, "kind": self.kind, "prompt": self.display_prompt,
             "options": list(self.options), "min": self.min_val, "max": self.max_val,
+            "step": self.step,
         }
 
 
@@ -94,6 +96,24 @@ class ConsoleSource(AnswerSource):
             if sel.isdigit() and 1 <= int(sel) <= len(q.options):
                 return int(sel) - 1
             print(f"  1~{len(q.options)} 사이를 입력하세요.")
+
+    def _step(self, q: Question) -> float:
+        """min_val~max_val 사이를, step 간격으로만 값을 받는 숫자 질문.
+
+        4.8%처럼 배율 자체가 간격인 값을 「몇 단계」가 아니라 **실수치**로 직접
+        받고 싶을 때 ask_int 대신 쓴다 — 화면에 뜨는 숫자가 곧 정련별 실수치라
+        스펙과 바로 대조된다."""
+        n_steps = round((q.max_val - q.min_val) / q.step)
+        while True:
+            try:
+                v = float(input(f"{q.prompt} ({q.min_val}~{q.max_val}, {q.step} 간격): ").strip())
+            except ValueError:
+                print(f"  {q.min_val}~{q.max_val} 사이를 {q.step} 간격으로 입력하세요.")
+                continue
+            idx = round((v - q.min_val) / q.step)
+            if 0 <= idx <= n_steps:
+                return q.min_val + idx * q.step
+            print(f"  {q.min_val}~{q.max_val} 사이를 {q.step} 간격으로 입력하세요.")
 
     def _multi(self, q: Question) -> list[int]:
         print(q.prompt)
@@ -138,7 +158,7 @@ class MappingSource(AnswerSource):
 
     @staticmethod
     def _default(q: Question):
-        return {"bool": False, "int": q.min_val, "choice": 0, "multi": []}[q.kind]
+        return {"bool": False, "int": q.min_val, "choice": 0, "multi": [], "step": q.min_val}[q.kind]
 
     def _coerce(self, q: Question, raw):
         """UI에서 온 값을 엔진이 기대하는 타입·범위로 맞춘다."""
@@ -149,6 +169,15 @@ class MappingSource(AnswerSource):
             want = int(raw)
             got  = max(q.min_val, min(want, q.max_val))
             if got != want:
+                self.stale.append(q.id)
+            return got
+
+        if q.kind == "step":
+            want = float(raw)
+            n_steps = round((q.max_val - q.min_val) / q.step)
+            idx = max(0, min(round((want - q.min_val) / q.step), n_steps))
+            got = q.min_val + idx * q.step
+            if abs(got - want) > 1e-9:
                 self.stale.append(q.id)
             return got
 
@@ -241,6 +270,17 @@ def ask_int(prompt: str, min_val: int = 0, max_val: int = 999) -> int:
 
 def ask_bool(prompt: str) -> bool:
     return _ask(Question(_next_id(), "bool", prompt, owner=_owner.get()))
+
+
+def ask_step(prompt: str, min_val: float, max_val: float, step: float) -> float:
+    """min_val~max_val 사이를 step 간격으로만 오르내리는 숫자 질문.
+
+    ask_int처럼 숫자 입력 위젯을 쓰되, 값이 임의의 정수가 아니라 **step의 배수**로만
+    움직인다. 버프량 자체가 고정 간격으로만 실리는 효과(예: 4.8%씩 쌓이는 스택)에
+    쓴다 — ask_choice로 각 단계를 문자열 선택지로 늘어놓는 대신, 화면에 실수치가
+    직접 찍히는 숫자 입력으로 받는다."""
+    return _ask(Question(_next_id(), "step", prompt,
+                         min_val=min_val, max_val=max_val, step=step, owner=_owner.get()))
 
 
 def ask_choice(prompt: str, options: list[str]) -> int:

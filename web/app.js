@@ -1328,6 +1328,18 @@ function widget(q) {
     e.onchange = () => bump(Number(e.value));
     return numField(e, q.max, { min: q.min, button: true });
   }
+  if (q.kind === "step") {
+    // ask_int과 같은 숫자 입력이지만 값이 임의의 정수가 아니라 q.step의 배수로만
+    // 움직인다(예: 4.8%씩). HTML step 속성은 증감 버튼만 그 간격으로 묶어 주므로,
+    // 손으로 어긋난 값을 입력하면 엔진(MappingSource._coerce)이 가장 가까운 배수로
+    // 스냅한다 — 그 결과가 「범위 조정됨」 배지로 뜬다.
+    const e = make("input", {
+      type: "number", step: q.step,
+      value: cur !== undefined ? cur : q.min,
+    });
+    e.onchange = () => bump(Number(e.value));
+    return numField(e, q.max, { min: q.min, button: true });
+  }
   if (q.kind === "choice") {
     const e = opt(q.options.map((o, i) => i), cur !== undefined ? cur : 0,
                   (i) => i, (i) => q.options[i]);

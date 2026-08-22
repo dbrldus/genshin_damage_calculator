@@ -11,3 +11,4 @@ from .rarity_5.surf_s_up import SurfSUp
 from .rarity_5.cashflow_supervision import CashflowSupervision
 from .rarity_5.tome_of_the_eternal_flow import TomeOfTheEternalFlow
 from .rarity_5.jadefall_s_splendor import JadefallSSplendor
+from .rarity_5.tulaytullah_s_remembrance import TulaytullahSRemembrance
