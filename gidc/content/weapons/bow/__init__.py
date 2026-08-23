@@ -7,3 +7,4 @@ from .rarity_5.aqua_simulacra import AquaSimulacra
 from .rarity_5.hunters_path import HuntersPath
 from .rarity_5.the_first_great_magic import TheFirstGreatMagic
 from .rarity_5.silvershower_heartstrings import SilvershowerHeartstrings
+from .rarity_5.astral_vultures_crimson_plumage import AstralVulturesCrimsonPlumage
