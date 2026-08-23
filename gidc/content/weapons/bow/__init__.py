@@ -5,3 +5,4 @@ from .rarity_5.thundering_pulse import ThunderingPulse
 from .rarity_5.polar_star import PolarStar
 from .rarity_5.aqua_simulacra import AquaSimulacra
 from .rarity_5.hunters_path import HuntersPath
+from .rarity_5.the_first_great_magic import TheFirstGreatMagic

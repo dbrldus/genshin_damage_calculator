@@ -64,6 +64,7 @@ from .bow import (
     PolarStar,
     AquaSimulacra,
     HuntersPath,
+    TheFirstGreatMagic,
 )
 
 WEAPON_REGISTRY: dict[str, type[Weapon]] = {
@@ -142,6 +143,7 @@ WEAPON_REGISTRY: dict[str, type[Weapon]] = {
     "극지의 별":               PolarStar,
     "약수":                  AquaSimulacra,
     "사냥꾼의 길":              HuntersPath,
+    "최초의 대마술":             TheFirstGreatMagic,
 }
 
 
