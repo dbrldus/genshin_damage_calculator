@@ -3,3 +3,4 @@ from .rarity_5.amos_bow import AmosBow
 from .rarity_5.elegy_for_the_end import ElegyForTheEnd
 from .rarity_5.thundering_pulse import ThunderingPulse
 from .rarity_5.polar_star import PolarStar
+from .rarity_5.aqua_simulacra import AquaSimulacra
