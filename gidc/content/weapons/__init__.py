@@ -68,6 +68,7 @@ from .bow import (
     SilvershowerHeartstrings,
     AstralVulturesCrimsonPlumage,
     TheDaybreakChronicles,
+    GoldenFrostboundOath,
 )
 
 WEAPON_REGISTRY: dict[str, type[Weapon]] = {
@@ -150,6 +151,7 @@ WEAPON_REGISTRY: dict[str, type[Weapon]] = {
     "심금을 울리는 하얀 비":        SilvershowerHeartstrings,
     "붉은 깃 별독수리":           AstralVulturesCrimsonPlumage,
     "여명이 트는 역사":           TheDaybreakChronicles,
+    "서리 맺힌 금빛 가지":         GoldenFrostboundOath,
 }
 
 
