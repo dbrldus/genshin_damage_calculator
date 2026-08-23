@@ -56,6 +56,10 @@ from .catalyst import (
     ReliquaryOfTruth,
 )
 
+from .bow import (
+    SkywardHarp,
+)
+
 WEAPON_REGISTRY: dict[str, type[Weapon]] = {
     "타오르는 천 개의 태양": AThousandBlazingSuns,
     "판정":               Verdict,
@@ -125,6 +129,7 @@ WEAPON_REGISTRY: dict[str, type[Weapon]] = {
     "천공의 두루마리":            SkywardAtlas,
     "밤을 엮는 거울":            NightweaverSLookingGlass,
     "진실의 함":               ReliquaryOfTruth,
+    "천공의 날개":              SkywardHarp,
 }
 
 
