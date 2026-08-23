@@ -61,6 +61,7 @@ from .bow import (
     AmosBow,
     ElegyForTheEnd,
     ThunderingPulse,
+    PolarStar,
 )
 
 WEAPON_REGISTRY: dict[str, type[Weapon]] = {
@@ -136,6 +137,7 @@ WEAPON_REGISTRY: dict[str, type[Weapon]] = {
     "아모스의 활":              AmosBow,
     "종말 탄식의 노래":           ElegyForTheEnd,
     "비뢰의 고동":              ThunderingPulse,
+    "극지의 별":               PolarStar,
 }
 
 
