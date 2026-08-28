@@ -3,6 +3,18 @@
 이 문서는 지금까지 구현된 캐릭터(스커크·모나·산드로네·설탕·한운·얀사 …)가 실제로 거쳐 온
 순서를 그대로 옮긴 것이다. 새 캐릭터를 넣을 때는 이 순서대로 진행한다.
 
+작업은 **기계가 하는 부분**과 **사람이 판단하는 부분**으로 갈린다.
+
+| | 누가 | 무엇 |
+|---|---|---|
+| 1~3단계 | `tools/new_character.py` | 계수 전사 검사 · 퍼센트 변환 · 표 등록 · 뼈대 · 등록 2곳 |
+| 4~8단계 | 사람(혹은 AI) | 효과를 어느 훅에 어떤 필드로 넣을지 |
+| 9~11단계 | `tools/check_characters.py` + 검증 | 조용히 틀리는 것 점검 · 기준선 diff |
+
+**1~3단계를 손으로 하지 않는다.** 계수 200~400개를 옮겨 적으면서 `*_TABLES` 등록과 등록
+2곳을 빠뜨리지 않기를 기대하는 것이 지금까지의 방식이었고, 실제로 등록된 17명 중 4명이
+`ascension_stat`를 빠뜨렸고 3명이 계수 표 등록을 빠뜨렸다. 둘 다 예외도 경고도 없이 지나간다.
+
 계산 순서(Phase)의 **단일 출처**는 [`gidc/core/party.py`](../gidc/core/party.py)의
 `Party.build_profiles`다. 아래에서 「Phase N」이라고 부르는 이름은 전부 거기서 정의된다.
 
@@ -10,120 +22,164 @@
 
 ## 0. 이 작업이 건드리는 파일
 
-| 파일 | 언제 |
-|---|---|
-| `gidc/content/characters/<원소>/<이름>.py` | 항상 — 본체 |
-| `gidc/content/characters/<원소>/__init__.py` | 항상 — `from .<이름> import <Class>` |
-| `gidc/content/characters/__init__.py` | 항상 — `CHARACTER_REGISTRY`에 한글 이름 |
-| `web/engine.zip` | 항상 — `python tools/sync_web.py`로 재생성 |
-| `gidc/core/profile.py` | 새 `SkillHit` 필드가 필요할 때만 |
-| `gidc/core/party.py` | 새 코어 풀 필드·파티 판정이 생길 때만 |
-| `gidc/core/explain.py` | 새 필드를 explain 화면에 태울 때만 |
-| `gidc/enums.py` / `gidc/core/reaction.py` | 새 `CharacterTrait`·반응 전환자일 때만 |
-| `web/icons.json` | **손대지 않는다** — 로스터 120명이 이미 들어 있다 |
+| 파일 | 언제 | 누가 |
+|---|---|---|
+| `_specs/characters/<모듈>.txt` | 항상 — 자료 원문 | 사람 |
+| `gidc/content/characters/<원소>/<모듈>.py` | 항상 — 본체 | 생성기 → 사람이 훅을 채움 |
+| `gidc/content/characters/<원소>/__init__.py` | 항상 — `from .<모듈> import <Class>` | 생성기 |
+| `gidc/content/characters/__init__.py` | 항상 — `CHARACTER_REGISTRY` | 생성기 |
+| `web/engine.zip` | 항상 — `python tools/sync_web.py`로 재생성 | 스크립트 |
+| `gidc/core/profile.py` | 새 `SkillHit` 필드가 필요할 때만 | 사람 |
+| `gidc/core/party.py` | 새 코어 풀 필드·파티 판정이 생길 때만 | 사람 |
+| `gidc/core/explain.py` | 새 필드를 explain 화면에 태울 때만 | 사람 |
+| `gidc/enums.py` / `gidc/core/reaction.py` | 새 `CharacterTrait`·반응 전환자일 때만 | 사람 |
+| `web/icons.json` | **손대지 않는다** — 로스터 120명이 이미 들어 있다 | — |
 
 등록 두 곳 중 **하나라도 빠지면** `make_character`가 조용히 `DefaultCharacter`로 대체한다.
-예외도 경고도 나지 않으므로 반드시 둘 다 확인한다.
+예외도 경고도 나지 않는다. 그래서 생성기가 두 곳을 함께 쓴다.
 
 ---
 
-## 1단계 — 참고 구현과 코어 계약을 먼저 읽는다
+## 1단계 — 자료를 스펙 파일로 옮긴다
 
-구현을 시작하기 전에 최소 이 넷을 읽는다.
+사용자가 준 스크린샷·원문을 요약하지 말고 `_specs/characters/<모듈>.txt`에 그대로 넣는다.
+이 파일이 나중에 기댓값의 출처가 된다 — 검증할 때 숫자를 다시 타이핑하지 않기 위해서다.
 
-1. `gidc/core/party.py` 상단 docstring — Phase 0~6의 정의.
-2. `gidc/core/character.py`의 훅 docstring — `build_hits` / `apply_self_buffs` /
-   `contribute_dependent_stats` / `apply_party_buffs` / `apply_dependent_buffs`.
-3. `gidc/core/profile.py`의 `SkillHit` 필드 목록과 `add()` 계약(지연 기여).
-4. **가장 가까운 동류 캐릭터** 한 명. 서포터면 얀사·한운·설탕, 딜러면 스커크·나비아,
-   달·별 반응 전환자면 콜롬비나·산드로네.
+> **자료를 사람에게서 받는 경우** 두 가지 길이 있다.
+>
+> - [`tools/intake_form.html`](../tools/intake_form.html) — 브라우저로 열어(더블클릭) 빈칸을
+>   채우고 계수 표를 붙여넣으면 **정리된 자료 한 덩어리**가 나온다. 위키 표의 칸 나누기와
+>   레벨 축만 세워 주고, 값은 적힌 그대로 넘긴다(`23.8%+26.6%`처럼 한 항목에 숫자가 여럿인
+>   표가 있어서 숫자로 뜯지 않는다). 서버도 계정도 필요 없다.
+>   **스펙으로 옮기는 것은 받는 쪽이 한다** — 표 이름·히트 이름·훅은 자료를 준 사람이
+>   정할 것이 아니다.
+> - [`_specs/characters/_INTAKE.md`](../_specs/characters/_INTAKE.md) — 텍스트로 주고받을
+>   때의 양식. 원문을 그대로 붙여넣기만 하고, 스펙으로 옮기는 것은 받는 쪽이 한다.
+>   채워진 원자료는 `_specs/characters/_intake/<영문이름>.md`에 남긴다.
 
-> 최신 파일을 그대로 베끼지 말 것. 훅 배치는 **수혜자가 누구냐**로 정해지므로 그 캐릭터에만
-> 맞는 배치일 수 있다. 자기 자신만 받는 효과는 유저 입력이 있더라도 `apply_self_buffs`다.
-
----
-
-## 2단계 — 스켈레톤 (사용자 확인 게이트)
-
-`skeleton_code/Anonymous.py`를 복사해 시작한다. 이 단계에서 **채우는 것**과 **비우는 것**이
-정해져 있다.
-
-**채운다**
-
-- 클래스명, `name`(한글), `weapon_type`, `rarity`, `ascension_stat`, `element` 프로퍼티
-- `innate_traits` / `unlockable_traits` (해당될 때만)
-- 계수 테이블 — 사용자가 준 공식 수치 스크린샷 기준
-- 등록 2곳
-
-**비운다**
-
-- 클래스 맨 위 docstring(스킬·특성·명함 설명) — 사용자가 공식 정보로 직접 채운다
-- 모든 훅 본문 — `...` + 무엇이 들어갈지 적은 TODO 주석까지만
-
-기억으로 채운 스킬 설명과 계수는 틀리기 쉽고, 틀린 값이 섞이면 계산 결과가 조용히 오염된다.
-스켈레톤을 낸 뒤 **사용자가 docstring/수치를 확정할 때까지 본문을 쓰지 않는다.**
-
----
-
-## 3단계 — 계수 표 전사
-
-스크린샷의 **모든 열**을 옮기고, 필요한 레벨 범위만 남긴다.
-
-- 일반/강/낙하 공격: **L1~L11** (특성 레벨 최대 10 + 보정 여지)
-- 원소 스킬 / 원소 폭발: **L1~L13** (명함 +3)
-- 스커크 「무예 전수」가 닿지 않는 원소(불·바위 등)는 L14 행이 필요 없다
-- 계수는 반드시 소수(`0.4700`)로. 위키의 세 자리 표기(`47.0`)는 잘린 값이라 정밀한 쪽을 쓴다
-
-**한 히트가 상태마다 다른 열을 쓰면 숫자가 같아도 열을 합치지 않는다.** 이름이 어느 상태인지
-말하게 두고(`_CA_COOLANT_CONDUCT` / `_CA_COOLANT_SWIRL`), 호출부도 열을 각각 짚는다
-(`conduct=` / `swirl=`). 한쪽만 바뀌는 날 조용히 어긋나는 것을 막는다.
-
-전사한 표는 **전부** 레벨 메타데이터에 등록한다. 여기 빠진 표는 클램프 경고가 살아나지 않아
-계수 누락이 드러나지 않는다.
-
-```python
-SKILL_LEVEL_UP_CONSTELLATION = 3
-BURST_LEVEL_UP_CONSTELLATION = 5
-NA_TABLES    = (*_NA, _CA, _THUNDERQUAKE, _PLUNGE, _LOW_PLUNGE, _HIGH_PLUNGE,)
-SKILL_TABLES = (_SKILL_DMG,)
-BURST_TABLES = (_BURST_DMG, _MEASURER_ATK_CAP,)
+```bash
+python tools/new_character.py --template
 ```
 
-계수가 아닌 상수(공격력 보너스 상한, 밤혼 최대치, 명함 계수 …)도 이름 있는 클래스 속성으로
-빼 둔다. 레벨 스케일하는 값이라면 표로 만들어 `*_TABLES`에 함께 등록한다.
+양식의 전체 레퍼런스는 [부록 C](#부록-c--스펙-양식-레퍼런스)에 있다. 실제 예는
+[`_specs/characters/iansan.txt`](../_specs/characters/iansan.txt)다.
+
+```
+이름: 얀사
+영문: Iansan
+원소: ELECTRO
+종류: POLEARM
+성급: 4
+어센션: ATK_PCT
+스킬명함: 3
+폭발명함: 5
+
+일반공격:
+  _NA[1] "{n}단 공격 피해" = 47.00/50.80/54.60/… %
+  _CA "강공격 피해" CHARGED_ATK = 100.30/108.40/… %
+
+원소스킬:
+  _SKILL_DMG "원소 스킬 피해" = 286.40/307.90/… %
+
+설명:
+E : 전광석화
+…
+```
+
+### 전사 규칙
+
+- 스크린샷의 **모든 열**을 옮기고, 필요한 레벨 범위만 남긴다.
+  - 일반/강/낙하 공격: **L1~L11** (특성 레벨 최대 10 + 보정 여지)
+  - 원소 스킬 / 원소 폭발: **L1~L13** (명함 +3)
+  - 스커크 「무예 전수」가 닿는 원소(물·얼음)는 L14 행이 더 필요하다. 닿지 않는 원소는 없어도 된다.
+- **게임 화면에 적힌 퍼센트 그대로** 적고 줄 끝에 ` %`를 붙인다. 생성기가 소수점을 두 자리
+  옮겨 `0.4700`으로 만든다. `float(x)/100`이 아니라 자리 이동이라 자릿수도 값도 그대로 남는다.
+- 위키의 세 자리 표기(`63.9`)는 잘린 값이다. 정밀한 쪽(`63.93`)을 쓴다.
+- **한 히트가 상태마다 다른 열을 쓰면 숫자가 같아도 열을 합치지 않는다.** 이름이 어느 상태인지
+  말하게 두고(`_CA_COOLANT_CONDUCT` / `_CA_COOLANT_SWIRL`), 히트도 따로 세운다. 한쪽만
+  바뀌는 날 조용히 어긋나는 것을 막는다.
+- 계수가 아닌 상수(공격력 보너스 상한, 밤혼 최대치, 명함 계수 …)는 `상수:` 섹션에 둔다.
+  레벨로 스케일하는 값이라면 상수가 아니라 해당 특성 섹션의 표로 만든다.
+- `설명:` 블록은 클래스 docstring이 된다. **기억으로 채우지 않는다** — 사용자가 준 공식
+  정보를 그대로 붙인다. 틀린 설명이 섞이면 나중에 판단의 근거가 오염된다.
 
 ---
 
-## 4단계 — 등록
+## 2단계 — 검사 (`--check`)
 
-```python
-# gidc/content/characters/electro/__init__.py
-from .iansan import Iansan
+```bash
+python tools/new_character.py _specs/characters/<모듈>.txt --check
 ```
 
-```python
-# gidc/content/characters/__init__.py
-CHARACTER_REGISTRY = {
-    ...
-    "얀사": electro.Iansan,
-}
 ```
+[얀사]  번개 · 장병기 · 4성 · Iansan
+  일반공격: 표 6개 · L1~L11 (필요 L10)
+  원소스킬: 표 1개 · L1~L13 (필요 L13)
+  원소폭발: 표 2개 · L1~L13 (필요 L13)
+  상수: 7개
+  히트 10개
+```
+
+여기서 거절되는 것들 — 전부 **손으로 하면 조용히 지나가는** 종류다.
+
+| 검사 | 왜 |
+|---|---|
+| 한 섹션의 표 길이가 서로 다름 | 한 특성의 계수 표는 레벨 수가 같다. 다르면 한쪽을 잘못 옮겼다 |
+| 표 길이 < 최대 실효 레벨(명함 포함) | 짧으면 `clamp_talent_index`가 마지막 레벨로 잘라 쓴다 |
+| 계수가 단조 수열이 아님 | 계수는 레벨이 오르면 커진다. 오르내림이 섞이면 옮겨 적다 틀렸다 |
+| `%` 없는데 소수점이 있음 | 퍼센트를 빠뜨리면 값이 **100배**가 되고 아무 데서도 안 걸린다 |
+| `%` 없는데 이름이 `_PCT`·`_RATIO`·`_BONUS`·`_DMG`로 끝남 | 같은 이유. 정수라 소수점 규칙에 안 걸린다 |
+| 히트 이름 중복 | `build_hits` 끝의 `{h.name: h}`에서 **하나가 소리 없이 사라진다** |
+| 영문 이름이 기초 스탯 표에 없음 | `stat_key`가 그 표의 열쇠다. 없으면 기초 HP/공격력/방어력을 못 읽는다 |
+| `스킬명함: N`인데 설명의 C*N* 줄이 레벨 상승을 말하지 않음 | C3/C5를 바꿔 적는 사고 |
+| 2차원 표인데 히트 이름에 `{n}`이 없음 | 단수마다 이름이 같아져 히트가 하나로 접힌다 |
+
+「정말 실수치라서 `%`가 없는 것」이면 옵션에 `실수치`를 적어 검사를 끈다.
 
 ---
 
-## 5단계 — 구현 계획 합의
+## 3단계 — 뼈대 생성과 등록
 
-본문을 쓰기 전에 **효과 하나하나를 어느 훅에 어떤 필드로 넣을지** 표로 적어 사용자 확인을
-받는다. 이 표가 곧 6~8단계의 작업 목록이 된다.
+`--check`를 뗀 같은 명령이 파일 생성과 등록 2곳을 한 번에 한다.
+
+```bash
+python tools/new_character.py _specs/characters/<모듈>.txt
+```
+
+생성되는 것:
+
+- 클래스 docstring (스펙의 `설명:` 블록 그대로)
+- `name` / `weapon_type` / `rarity` / `ascension_stat` / `element` / (선언했다면) 특성
+- 계수 표 전부와 `NA_TABLES` / `SKILL_TABLES` / `BURST_TABLES` **빠짐없는** 등록
+- `build_hits` **완성본** — 계수·원소·스킬 종류·스케일 스탯이 전부 채워진다
+- 훅 넷의 자리 — `pass` + 관용구 주석 + `# TODO(생성기)` 표시
+- 「의도적 미구현」 블록의 자리
+
+훅 본문은 **비어 있다.** 어느 훅에 어떤 필드로 넣을지는 스크립트가 판단하지 않는다.
+
+> `skeleton_code/Anonymous.py`를 손으로 복사하던 옛 경로는 쓰지 않는다. 계수 검사·표 등록·
+> 등록 2곳을 전부 사람이 지게 되고, 그게 지금까지 누락이 난 자리다.
+
+---
+
+## 4단계 — 구현 계획 합의 (사용자 확인 게이트)
+
+훅 본문을 쓰기 전에 **효과 하나하나를 어느 훅에 어떤 필드로 넣을지** 표로 적어 사용자 확인을
+받는다. 이 표가 곧 5~8단계의 작업 목록이 된다.
 
 | 효과 | 수혜자 | 훅(Phase) | 필드 | 유저 입력 |
 |---|---|---|---|---|
 | A1 표준 동작 공격력 +20% | 얀사 본인 | `apply_self_buffs` (3) | `atk_pct` | 「표준 동작」 여부 |
 | C2 필드 위 캐릭터 공격력 +30% | 파티 1명 | `contribute_dependent_stats` (4) | `atk_pct` | 필드 위 캐릭터 |
 | C6 주는 피해 +25% | 파티 1명 | `apply_party_buffs` (4.5) | `all_dmg_bonus` | 「극한의 힘」 여부 |
-| Q 운동량 측정기 | 파티 1명 | `apply_dependent_buffs` (5) | `atk_flat_derived` (지연) | 밤혼 수치 |
+| Q 운동량 측정기 | 파티 1명 | `apply_dependent_buffs` (5) | `atk_from_pct_share` (지연) | 밤혼 수치 |
 
-### 훅 고르는 기준
+E / Q / A1 / A4 / C1~C6을 **하나도 빠뜨리지 말고** 줄에 올린다. 구현하지 않기로 한 것도
+「미구현」이라고 적어 둔다 — 그게 9단계의 초안이 된다.
+
+---
+
+## 5단계 — 훅 고르는 기준
 
 | 이 효과가… | 훅 | Phase |
 |---|---|---|
@@ -135,40 +191,19 @@ CHARACTER_REGISTRY = {
 훅을 정하는 것은 **수혜자**지 트리거가 아니다. 「낙뢰파 명중 후 얀사의 공격력 +20%」는
 트리거가 히트여도 받는 쪽이 얀사뿐이므로 자기 버프다.
 
----
+가장 가까운 동류 캐릭터 한 명을 읽되 **그대로 베끼지 않는다.** 훅 배치는 그 캐릭터의
+수혜자 구조에만 맞는 것일 수 있다. 서포터면 얀사·한운·설탕, 딜러면 스커크·나비아,
+달·별 반응 전환자면 콜롬비나·산드로네.
 
-## 6단계 — `build_hits`
+구현 전에 최소 이 셋을 읽는다.
 
-계수·원소·스킬 종류만 세운다. 스탯은 전부 기본값이다.
-
-```python
-def build_hits(self) -> dict[str, SkillHit]:
-    sk = self._skill_index()   # C3 스킬 +3 반영
-    bl = self._burst_index()   # C5 폭발 +3 반영
-    nl = self._na_index()
-
-    hits: list[SkillHit] = []
-    for i, row in enumerate(self._NA):
-        hits.append(SkillHit(f"{i+1}단 공격 피해", SkillType.NORMAL_ATK, row[nl], ScalingStat.ATK))
-    hits.append(SkillHit("원소 스킬 피해", SkillType.SKILL, self._SKILL_DMG[sk],
-                         ScalingStat.ATK, Element.ELECTRO))
-    return {h.name: h for h in hits}
-```
-
-- 레벨 인덱스는 **직접 계산하지 말고** `_na_index()` / `_skill_index()` / `_burst_index()`를
-  쓴다. 명함 상승·파티 상승·클램프가 전부 그 안에 들어 있다.
-- `element`를 주지 않으면 물리 피해다. 무기 종류가 정하는 일반/강/낙하는 보통 물리이고,
-  원소 성질을 띠는 변형 공격(「낙뢰파」 등)만 명시한다.
-- 서로 배타적인 히트(강공격 ↔ 대체 강공격)는 **둘 다 세워 둔다.** 어느 쪽을 합산할지는
-  화면을 읽는 쪽이 고른다.
-- 달·별 반응 직접 피해 히트는 `coeff_amp`가 아니라 `coeff`를 쓴다. 공식에 `coeff_amp`
-  자리가 없어 조용히 무효가 된다.
-- 파티로 유도되지 않는 히트 원소(흡수 등)는 자리표로 두고 Phase 4에서 확정하거나 히트를
-  지운다.
+1. `gidc/core/party.py` 상단 docstring — Phase 0~6의 정의.
+2. `gidc/core/character.py`의 훅 docstring.
+3. `gidc/core/profile.py`의 `SkillHit` 필드 목록과 `add()` 계약(지연 기여).
 
 ---
 
-## 7단계 — 유저 입력 설계
+## 6단계 — 유저 입력 설계
 
 ### 어디서 묻는가
 
@@ -201,7 +236,10 @@ self._q_active = ask_bool("[얀사 Q] 힘의 3요소 발동 (운동량 측정기
 
 ---
 
-## 8단계 — 훅 본문
+## 7단계 — 훅 본문
+
+생성된 파일의 각 훅에는 관용구 주석이 들어 있다. 채운 훅에서는 `# TODO(생성기)` 줄을 지우고,
+해당이 없는 훅은 **메서드째 지운다.**
 
 ### `apply_self_buffs` — Phase 3
 
@@ -230,7 +268,7 @@ Phase 4에서 저장해둔 상태를 재사용해 같은 질문을 두 번 묻�
 source_hit = next(iter(all_hits[self].values()))
 bonus = lambda: self._measurer_atk_bonus(source_hit.convertible_atk())
 for hit in all_hits[self._on_field].values():
-    hit.add("atk_flat_derived", bonus, self, note="Q 운동량 측정기")
+    hit.add("atk_from_pct_share", bonus, self, note="Q 운동량 측정기")
 ```
 
 - 지금 계산해 버리면 파티 멤버 순서가 결과를 바꾼다. 함수로 넘기면 그 필드를 읽는
@@ -252,9 +290,24 @@ for hit in all_hits[self._on_field].values():
 같은 슬롯을 읽고 쓰면 지연 평가에서 순환이 된다. 피해 차원으로 바꾸거나 꼬리표 달린
 별도 슬롯으로 내보내 사슬을 끊는다.
 
+### 히트를 더 만들거나 지워야 할 때
+
+`build_hits`는 생성기가 채워 주지만, 조건에 따라 붙었다 말았다 하는 히트는 사람 몫이다.
+
+- 명함으로만 생기는 히트는 `build_hits`에서 `if self.constellation >= N:`으로 덧붙인다.
+- 서로 배타적인 히트(강공격 ↔ 대체 강공격)는 **둘 다 세워 둔다.** 어느 쪽을 합산할지는
+  화면을 읽는 쪽이 고른다.
+- 달·별 반응 직접 피해 히트는 `coeff_amp`가 아니라 `coeff`를 쓴다. 공식에 `coeff_amp`
+  자리가 없어 조용히 무효가 된다.
+- 파티로 유도되지 않는 히트 원소(흡수 등)는 자리표로 두고 Phase 4에서 확정하거나 히트를
+  지운다.
+- 특성 레벨이 아닌 다른 축으로 인덱싱하는 표(나비아의 「맞은 장미탄 개수」)는 `*_TABLES`에
+  **넣지 않는다.** 대신 클래스에 `NON_TALENT_TABLES = (_표이름,)`으로 선언해 점검 도구가
+  「등록을 빠뜨린 것」과 구별하게 한다.
+
 ---
 
-## 9단계 — 「의도적 미구현」 블록
+## 8단계 — 「의도적 미구현」 블록
 
 파일 맨 아래에 **무엇을 왜 넣지 않았는지** 적는다. 나중에 「빠뜨린 것」과 「안 넣기로 한 것」을
 구분하는 유일한 근거다.
@@ -270,7 +323,7 @@ for hit in all_hits[self._on_field].values():
 
 ---
 
-## 10단계 — 코어에 손대야 하는 경우
+## 9단계 — 코어에 손대야 하는 경우
 
 새 메커니즘이면 캐릭터 파일만으로 끝나지 않는다. 얀사(`atk_flat_derived`)와
 산드로네(별 반응)가 그 예다.
@@ -287,9 +340,20 @@ for hit in all_hits[self._on_field].values():
 
 ---
 
-## 11단계 — 검증 (세 가지 전부)
+## 10단계 — 점검과 검증
 
-### (1) 파생 공식 기반 자체 검증
+### (1) 점검 도구 — 조용히 틀리는 것들
+
+```bash
+python tools/check_characters.py <이름>
+```
+
+FAIL이 남아 있으면 끝난 것이 아니다. 무엇을 잡는지는 스크립트 맨 위 docstring에 있다.
+`TODO(생성기)` 잔존과 「의도적 미구현」 블록 누락도 여기서 걸린다.
+
+전원 점검은 인자 없이 돌린다. `--quiet`는 문제 있는 캐릭터만 보여 준다.
+
+### (2) 파생 공식 기반 자체 검증
 
 기댓값을 **손으로 타이핑하지 말고** `m.base_atk` 등에서 식으로 유도해 비교한다. 눈으로 옮겨
 적은 상수는 자릿수 때문에 가짜 MISMATCH를 낸다.
@@ -299,7 +363,7 @@ for hit in all_hits[self._on_field].values():
 검증 스크립트는 `_presets/solo/<이름>.py` 꼴로 빌드를 하나 만들어 `Party(char)`를 돌리는
 방식이 가장 짧다.
 
-### (2) 계수 표 누락 — 클램프 경고를 실패로 승격
+### (3) 클램프 경고를 실패로 승격
 
 ```python
 import warnings
@@ -307,7 +371,10 @@ warnings.simplefilter("error")   # character.clamp_talent_index의 경고를 예
 # 무예 전수(물·얼음 파티) 포함 여러 조합으로 build_profiles를 돌린다
 ```
 
-### (3) 회귀 기준선 diff
+`check_characters.py`가 `build_hits` 단계의 경고는 이미 잡지만, 파티발 레벨 상승은 파티를
+꾸려야 재현된다.
+
+### (4) 회귀 기준선 diff
 
 ```bash
 python bench.py < _baseline/answers.txt > /tmp/out.txt 2>&1
@@ -323,7 +390,7 @@ diff _baseline/baseline.txt /tmp/out.txt
 
 ---
 
-## 12단계 — 웹 반영
+## 11단계 — 웹 반영
 
 ```bash
 python tools/sync_web.py
@@ -337,16 +404,18 @@ python tools/sync_web.py
 
 ---
 
-## 13단계 — 커밋과 보고
+## 12단계 — 커밋과 보고
 
-커밋 범위: 캐릭터 파일 + 등록 2곳 + `web/engine.zip` (+ 필요했다면 코어 변경).
+커밋 범위: 스펙 파일 + 캐릭터 파일 + 등록 2곳 + `web/engine.zip` (+ 필요했다면 코어 변경).
+제목은 `캐릭터 추가 - <이름>`.
 
 **보고는 Phase별이 아니라 특성별로 쓴다** — E / Q / A1 / A4 / C1~C6 각각이 어디에 구현됐는지.
 여기에 반드시 포함한다.
 
-1. 검증 결과 (표 형태 — 기댓값 유도식과 실제값)
-2. 기준선 diff 결과
-3. **의도적으로 미구현한 항목**
+1. 코어를 건드렸는지 여부 (「코어 수정 없음」도 정보다)
+2. **판단이 갈린 자리와 그 이유** — 왜 이 훅인지, 왜 이 질문 꼴인지
+3. 검증 결과 (표 형태 — 기댓값 유도식과 실제값), `check_characters.py` 결과, 기준선 diff
+4. **의도적으로 미구현한 항목**
 
 ---
 
@@ -368,11 +437,79 @@ python tools/sync_web.py
 
 ## 부록 B — 자주 하는 실수
 
+생성기와 점검 도구가 잡아 주는 것 (**손으로 하면 조용히 지나간다**)
+
 - 등록 2곳 중 하나 누락 → `DefaultCharacter`로 조용히 대체. 경고 없음
+- `ascension_stat` 미선언 → 어센션 보너스가 통째로 0
 - `*_TABLES`에 표 등록 누락 → 클램프 경고가 죽어 계수 누락이 드러나지 않음
+- 계수에 `%` 누락 → 값이 100배
+- 히트 이름 중복 → `{h.name: h}`에서 하나가 소리 없이 사라짐
+- 표 길이가 최대 실효 레벨에 못 미침 → 마지막 레벨로 잘려 쓰임
+
+사람만 잡을 수 있는 것
+
 - 지연 기여 함수 안에서 `ask_*` 호출 → 질문 집합이 흔들림
 - Phase 5에서 코어 풀에 즉시 값 가산 → 정확성 가드 실패(순서 의존)
 - 공격력→공격력을 `atk_flat`으로 출력 → 자기 참조 순환
 - 달·별 히트에 `coeff_amp` 사용 → 공식에 자리가 없어 조용히 무효
 - 「현재 필드 위 캐릭터」 효과를 파티 전원에게 적용 → 과대 계산
 - `hit.field += x` 직접 가산 → explain 원장에 출처가 남지 않음
+- 「의도적 미구현」 블록 생략 → 다음 사람이 누락과 구별하지 못함
+
+---
+
+## 부록 C — 스펙 양식 레퍼런스
+
+### 머리말 (`키: 값`)
+
+| 키 | 필수 | 값 |
+|---|---|---|
+| `이름` | ● | 한글 이름. `CHARACTER_REGISTRY`의 열쇠가 된다 |
+| `영문` | ● | 영문 이름. 클래스명과 `stat_key`가 된다. 기초 스탯 표에 있어야 한다 |
+| `원소` | ● | `PYRO` `HYDRO` `CRYO` `ELECTRO` `ANEMO` `GEO` `DENDRO` |
+| `종류` | ● | `SWORD` `CLAYMORE` `POLEARM` `CATALYST` `BOW` |
+| `성급` | ● | `4` 또는 `5`. 기초 스탯 성장 곡선을 고른다 |
+| `어센션` | ● | `StatType` 이름 (`ATK_PCT` `CRIT_DMG` `ELEMENTAL_MASTERY` `GEO_DMG` …) |
+| `일반명함` `스킬명함` `폭발명함` | | 그 특성 레벨을 +3 하는 명함 번호. 없으면 생략 |
+| `특성` | | `CharacterTrait` 이름 쉼표 구분 → `innate_traits` |
+| `획득특성` | | 같은 꼴 → `unlockable_traits` (니콜의 「마녀의 과제」 등) |
+| `클래스` | | 클래스명을 영문에서 유도하지 않고 직접 지정할 때만 |
+
+### 섹션
+
+| 섹션 | 만드는 것 | 기본 `SkillType` | 인덱스 |
+|---|---|---|---|
+| `일반공격:` | `NA_TABLES` | `NORMAL_ATK` | `nl = self._na_index()` |
+| `원소스킬:` | `SKILL_TABLES` | `SKILL` | `sk = self._skill_index()` |
+| `원소폭발:` | `BURST_TABLES` | `BURST` | `bl = self._burst_index()` |
+| `상수:` | 클래스 속성 (스칼라) | — | — |
+| `설명:` | 클래스 docstring | — | — |
+
+### 계수 줄
+
+```
+  _TABLE[행] "히트 이름" 옵션... = 값/값/값 %
+```
+
+- `_TABLE` — 클래스 속성 이름. `_`로 시작한다.
+- `[행]` — `_NA[1]` `_NA[2]` … 로 적으면 2차원 표 `_NA`로 묶인다. 이때 히트 이름에
+  `{n}`을 넣으면 단수로 채워진다(`"{n}단 공격 피해"`).
+- `"히트 이름"` — 생략하거나 `"-"`로 적으면 표만 만들고 히트는 만들지 않는다.
+- 옵션 — `SkillType` / `Element` / `ScalingStat` 이름과 `실수치`. 적은 항목만 덮어쓴다.
+  순서는 상관없다.
+- 값 — 게임 화면의 퍼센트 그대로, 줄 끝에 ` %`. 다음 줄로 이어 써도 된다.
+
+기본값 (옵션을 안 적었을 때)
+
+| 항목 | 기본 |
+|---|---|
+| `SkillType` | 섹션이 정한다 |
+| `ScalingStat` | `ATK` |
+| `Element` (일반/강/낙하) | 법구 캐릭터면 자기 원소, 아니면 **물리**(미지정) |
+| `Element` (스킬/폭발) | 자기 원소 |
+
+### 주석
+
+- `##` — 스펙 양식 설명. 생성된 코드로 넘어가지 않는다.
+- `#` — 바로 아래 표에 붙는 주석. **코드에 그대로 실린다.** 「이 열이 무엇인지」,
+  「왜 이 레벨로 스케일하는지」를 여기 남긴다.
