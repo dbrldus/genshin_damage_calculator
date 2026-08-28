@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>캐릭터 자료 넘김</title>
+<style>
+  :root {
+    --bg:#f7f7f5; --panel:#fff; --ink:#1c1c1a; --dim:#6b6b66; --line:#e0e0da;
+    --accent:#2f6f4e; --bad:#a8302a; --warn:#8a6100; --code:#f1f1ec;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#17181a; --panel:#1f2124; --ink:#e6e6e2; --dim:#9a9a94; --line:#33363b;
+      --accent:#7dc79c; --bad:#e8837c; --warn:#e0b062; --code:#26282c;
+    }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:24px 16px 72px; background:var(--bg); color:var(--ink);
+         font:15px/1.6 "Pretendard","Malgun Gothic",system-ui,sans-serif; }
+  .wrap { max-width:1000px; margin:0 auto; }
+  h1 { font-size:22px; margin:0 0 4px; }
+  h2 { font-size:16px; margin:0 0 12px; padding-bottom:8px; border-bottom:1px solid var(--line); }
+  h3 { font-size:14px; margin:16px 0 6px; color:var(--dim); font-weight:600; }
+  .lead { color:var(--dim); margin:0 0 22px; font-size:14px; }
+  section { background:var(--panel); border:1px solid var(--line); border-radius:10px;
+            padding:18px; margin-bottom:16px; }
+  label { display:block; font-size:13px; color:var(--dim); margin-bottom:4px; }
+  input, select, textarea { width:100%; padding:7px 9px; border:1px solid var(--line);
+    border-radius:6px; background:var(--bg); color:var(--ink); font:inherit; }
+  textarea { font:13px/1.5 ui-monospace,"Consolas",monospace; resize:vertical; }
+  .grid { display:grid; gap:12px 14px; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); }
+  .hint { font-size:12px; color:var(--dim); margin:6px 0 0; }
+  .hint b { color:var(--ink); }
+  table.rows { width:100%; border-collapse:collapse; margin-top:8px; font-size:13px; }
+  table.rows th { text-align:left; font-weight:600; color:var(--dim); font-size:12px; padding:4px 6px; }
+  table.rows td { padding:3px 6px; border-top:1px solid var(--line); vertical-align:middle; }
+  table.rows input { padding:4px 6px; font-size:13px; }
+  td.vals { color:var(--dim); font:12px ui-monospace,monospace; }
+  td.vals span { white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+                 max-width:340px; display:block; }
+  .row-off { opacity:.4; }
+  .toolbar { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-top:8px; }
+  .toolbar label { display:flex; gap:6px; align-items:center; margin:0; font-size:13px; }
+  .toolbar select { width:auto; }
+  button { padding:8px 14px; border:1px solid var(--line); border-radius:6px; cursor:pointer;
+           background:var(--panel); color:var(--ink); font:inherit; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .msgs { margin:0 0 10px; padding:0; list-style:none; font-size:13px; }
+  .msgs li { padding:6px 10px; border-radius:6px; margin-bottom:5px; }
+  .msgs li.bad  { background:color-mix(in srgb,var(--bad) 12%,transparent);  color:var(--bad); }
+  .msgs li.warn { background:color-mix(in srgb,var(--warn) 14%,transparent); color:var(--warn); }
+  .msgs li.ok   { background:color-mix(in srgb,var(--accent) 12%,transparent); color:var(--accent); }
+  #out { height:200px; background:var(--code); }
+  summary { cursor:pointer; font-size:15px; font-weight:600; padding:2px 0; }
+  summary::marker { color:var(--dim); }
+  .paste-help { font-size:12px; color:var(--dim); }
+  .paste-help pre { background:var(--code); padding:8px; border-radius:6px;
+                    overflow-x:auto; font-size:11px; margin:6px 0; }
+  /* 결과는 접어 둔다. 어디서든 누를 수 있는 작은 버튼만 떠 있다. */
+  #dock { position:fixed; right:18px; bottom:18px; display:flex; gap:8px; align-items:center;
+          background:var(--panel); border:1px solid var(--line); border-radius:999px;
+          padding:6px 8px 6px 14px; box-shadow:0 3px 14px rgba(0,0,0,.16); z-index:10; }
+  #dockStat { font-size:12px; color:var(--dim); white-space:nowrap; }
+  #dock button { padding:6px 12px; border-radius:999px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>캐릭터 자료 넘김</h1>
+<p class="lead">
+  게임·위키의 표와 문구를 <b>그대로 붙여넣기만</b> 하면 정리된 자료 한 덩어리가 나옵니다.
+  계수를 소수로 바꾸거나, 어떤 히트로 만들지, 어느 훅에 넣을지는 <b>받는 쪽이 정합니다</b> —
+  여기서는 고를 것이 거의 없습니다.
+</p>
+
+<section>
+  <h2>1. 기본 정보</h2>
+  <div class="grid">
+    <div><label>한글 이름</label><input id="krName" placeholder="피슬"></div>
+    <div><label>영문 이름</label><input id="enName" placeholder="Fischl"></div>
+    <div><label>원소</label><select id="element"></select></div>
+    <div><label>무기 종류</label><select id="weapon"></select></div>
+    <div><label>성급</label><select id="rarity"><option value="5">5성</option><option value="4">4성</option></select></div>
+    <div><label>돌파 보너스 스탯</label><select id="ascension"></select></div>
+  </div>
+  <p class="hint">
+    <b>돌파 보너스 스탯</b>은 캐릭터 상세 화면에서 돌파할 때마다 오르는 스탯 하나입니다.
+    값(38.4% 같은 것)은 필요 없고 <b>무슨 스탯인지만</b> 고르면 됩니다 —
+    이게 빠지면 계산에서 보너스가 통째로 0이 되고 경고도 나지 않습니다.
+  </p>
+
+  <h3>특성 레벨을 +3 하는 명함 (모르면 비워 두세요)</h3>
+  <div class="grid">
+    <div><label>일반 공격</label><input id="cNa" type="number" min="1" max="6"></div>
+    <div><label>원소 스킬</label><input id="cSkill" type="number" min="1" max="6" placeholder="보통 3"></div>
+    <div><label>원소 폭발</label><input id="cBurst" type="number" min="1" max="6" placeholder="보통 5"></div>
+  </div>
+</section>
+
+<section>
+  <h2>2. 계수 표</h2>
+  <p class="hint" style="margin:0 0 4px">
+    표를 <b>통째로</b> 붙여넣으세요. 안 쓰는 행이 섞여 있어도 그대로 두시면 됩니다.
+    <b>레벨이 세로인 표</b>를 기본으로 읽습니다.
+  </p>
+  <details class="paste-help">
+    <summary style="font-size:12px;font-weight:400">이런 표를 그대로 받습니다</summary>
+    <pre>특성 레벨	1단 / 2단 / 3단 공격 피해	조준 사격	그림자 관통 화살 피해	저공/고공 추락 충격 피해
+1	52.6% / 23.8%+26.6% / 74%	43.90%	공격력의 140%+원소 마스터리의 134.6%	113.6% / 141.9%
+2	56.9% / 25.7%+28.8% / 80%	47.40%	공격력의 150.5%+원소 마스터리의 144.7%	122.9% / 153.5%</pre>
+    · 한 칸에 <b>슬래시로 여러 항목</b>이 들어 있으면 헤더 이름과 함께 갈라집니다
+    (「1단 / 2단 / 3단 공격 피해」 → 1단 공격 피해 · 2단 공격 피해 · 3단 공격 피해).<br>
+    · <b>한 항목 안의 값은 건드리지 않습니다</b> — <code>23.8%+26.6%</code>(2타)나
+    <code>공격력의 140%+원소 마스터리의 134.6%</code>는 적힌 그대로 넘어갑니다.<br>
+    · 맨 앞 레벨 열은 알아서 버립니다. 한 줄이 항목 하나인 표라면 「레벨 축」을 가로로 바꾸세요.
+  </details>
+  <div id="sections"></div>
+</section>
+
+<section>
+  <h2>3. 특성 설명 — 원문 그대로</h2>
+  <p class="hint" style="margin:0 0 10px">요약하지 마세요. 줄바꿈도 게임 문구대로 두시면 됩니다.</p>
+  <div id="desc"></div>
+</section>
+
+<section>
+  <h2>4. 그 밖의 수치 · 판단 메모 <span style="font-weight:400;color:var(--dim);font-size:13px">(선택)</span></h2>
+  <label>표로 주어지지 않은 수치 (스택당 12%, 밤혼 최대치 54pt, 상한 …)</label>
+  <textarea id="extra" rows="3"></textarea>
+  <label style="margin-top:12px">알아서 정하지 <b>않았으면 하는</b> 것</label>
+  <textarea id="notes" rows="3" placeholder="구현하지 말 것: C4 (에너지 회복뿐)&#10;실측으로 확인한 것: ..."></textarea>
+</section>
+
+<section>
+  <details id="outBox">
+    <summary>결과 보기</summary>
+    <ul class="msgs" id="msgs"></ul>
+    <textarea id="out" readonly spellcheck="false"></textarea>
+    <div class="toolbar">
+      <button type="button" id="download">파일로 저장</button>
+      <span class="hint" style="margin:0">복사해서 붙여넣거나, 파일로 주시면 됩니다.</span>
+    </div>
+  </details>
+</section>
+
+</div>
+
+<div id="dock">
+  <span id="dockStat"></span>
+  <button type="button" class="primary" id="copy">자료 복사</button>
+</div>
+
+<script>
+"use strict";
+
+const ELEMENTS = [["PYRO","불"],["HYDRO","물"],["CRYO","얼음"],["ELECTRO","번개"],
+                  ["ANEMO","바람"],["GEO","바위"],["DENDRO","풀"]];
+const WEAPONS  = [["SWORD","한손검"],["CLAYMORE","대검"],["POLEARM","장병기"],
+                  ["CATALYST","법구"],["BOW","활"]];
+const ASCENSION = [["","— 고르세요 —"],["ATK_PCT","공격력%"],["HP_PCT","HP%"],["DEF_PCT","방어력%"],
+  ["ELEMENTAL_MASTERY","원소 마스터리"],["ENERGY_RECHARGE","원소 충전 효율"],
+  ["CRIT_RATE","치명타 확률"],["CRIT_DMG","치명타 피해"],["HEALING_BONUS","치유 보너스"],
+  ["PYRO_DMG","불 원소 피해 보너스"],["HYDRO_DMG","물 원소 피해 보너스"],
+  ["CRYO_DMG","얼음 원소 피해 보너스"],["ELECTRO_DMG","번개 원소 피해 보너스"],
+  ["ANEMO_DMG","바람 원소 피해 보너스"],["GEO_DMG","바위 원소 피해 보너스"],
+  ["DENDRO_DMG","풀 원소 피해 보너스"],["PHYSICAL_DMG","물리 피해 보너스"]];
+
+const SECTIONS = [
+  { key:"일반 공격 · 강공격 · 낙하 공격", hint:"보통 L1~L15로 실려 있습니다. 전부 넣어 주세요." },
+  { key:"원소 스킬", hint:"" },
+  { key:"원소 폭발", hint:"" },
+];
+
+// 항목마다 칸을 따로 둔다 — 한 칸에 몰아 받으면 어느 문구가 어느 특성인지 흐려진다.
+const DESC_FIELDS = [
+  { id:"dNa", head:"",   rows:4, label:"일반 공격 / 강공격 / 낙하 공격",
+    ph:"일반 공격 : ...\n강공격 : ...\n낙하 공격 : ..." },
+  { id:"dE",  head:"E",  rows:5, label:"원소 스킬 (E)", named:"스킬 이름" },
+  { id:"dQ",  head:"Q",  rows:5, label:"원소 폭발 (Q)", named:"폭발 이름" },
+  { id:"dA1", head:"A1", rows:3, label:"고유 특성 A1",  named:"특성 이름" },
+  { id:"dA4", head:"A4", rows:3, label:"고유 특성 A4",  named:"특성 이름" },
+  ...[1,2,3,4,5,6].map(n => ({ id:"dC"+n, head:"C"+n, rows:2,
+                               label:"명함 C"+n, named:"명함 이름" })),
+];
+
+// 이 낱말이 든 항목은 피해 계수가 아니다 — 기본으로 꺼 두되 눈에는 보이게 남긴다.
+const NOT_A_HIT = /쿨타임|재사용|지속\s*시간|스태미나|에너지|CD|소모/;
+
+const $  = s => document.querySelector(s);
+const el = (t, p={}, k=[]) => { const n = Object.assign(document.createElement(t), p);
+                                k.forEach(c => n.append(c)); return n; };
+const opts = (pairs, sel) => pairs.map(([v,t]) =>
+  el("option", { value:v, textContent:t, selected:v===sel }));
+
+// ── 표 파싱 ────────────────────────────────────────────────────────────────
+// 값을 **숫자로 뜯지 않는다.** 「23.8%+26.6%」(2타 합)나 「공격력의 140%+원소 마스터리의
+// 134.6%」처럼 한 항목 안에 숫자가 여럿인 표가 있어서, 숫자만 긁으면 항목 경계가 무너진다.
+// 여기서 하는 일은 **칸을 항목으로 가르고 레벨 축을 세우는 것**까지고, 값은 적힌 그대로 넘긴다.
+
+const hasDigit = t => /\d/.test(t);
+
+/** 줄 → 칸. 탭이 있으면 탭만, 없으면 두 칸 이상 공백. 칸 안의 슬래시는 건드리지 않는다. */
+function splitRow(line) {
+  return (line.includes("\t") ? line.split("\t") : line.split(/\s{2,}/)).map(c => c.trim());
+}
+
+/** 한 칸을 슬래시로 가른다. 「23.8%+26.6%」는 하나로 남는다. */
+const splitItems = cell => cell.split("/").map(t => t.trim()).filter(t => t !== "");
+
+/** 한 칸에 항목이 k개면 헤더 이름도 k개로. 마지막 조각의 꼬리말을 공통으로 본다.
+ *  「1단 / 2단 / 3단 공격 피해」 → 1단 공격 피해 · 2단 공격 피해 · 3단 공격 피해
+ *  「저공/고공 추락 충격 피해」   → 저공 추락 충격 피해 · 고공 추락 충격 피해 */
+function splitHeader(label, k) {
+  label = (label || "").trim();
+  if (k <= 1) return [label];
+  const parts = label.split("/").map(t => t.trim()).filter(Boolean);
+  if (parts.length !== k) {
+    return Array.from({ length:k }, (_, i) => (label ? `${label} (${i+1})` : ""));
+  }
+  const last = parts[k-1].split(/\s+/);
+  if (last.length > 1) {
+    const tail = last.slice(1).join(" ");
+    return [...parts.slice(0, k-1).map(t => `${t} ${tail}`), `${last[0]} ${tail}`];
+  }
+  return parts;
+}
+
+const isLevelColumn = vals => vals.every((v, i) => v.trim() === String(i + 1));
+
+/** 레벨이 세로인 표 (기본). */
+function parseDown(lines) {
+  const grid    = lines.map(splitRow);
+  const hasHead = grid.length > 1 && !/^\d+$/.test(grid[0][0] ?? "");
+  const header  = hasHead ? grid[0] : null;
+  const data    = hasHead ? grid.slice(1) : grid;
+  const width   = Math.max(...data.map(r => r.length));
+
+  const out = [];
+  for (let c = 0; c < width; c++) {
+    const cells = data.map(r => r[c] ?? "");
+    if (!cells.some(hasDigit)) continue;
+    const k = Math.max(...cells.map(x => splitItems(x).length));
+    const names = splitHeader(header ? header[c] : "", k);
+    for (let j = 0; j < k; j++) {
+      out.push({ name: names[j] ?? "", values: cells.map(x => splitItems(x)[j] ?? "") });
+    }
+  }
+  return out;
+}
+
+/** 레벨이 가로인 표 — 한 줄이 항목 하나. */
+function parseAcross(lines) {
+  return lines.map(line => {
+    const cells = (line.includes("\t") || /\s{2,}/.test(line))
+      ? splitRow(line)
+      : (() => { const [h, ...r] = line.split(/[:：]/);
+                 return [h.trim(), ...splitItems(r.join(":"))]; })();
+    const first = cells.findIndex(hasDigit);
+    if (first < 1) return { name:"", values:cells.filter(hasDigit) };
+    return { name: cells.slice(0, first).join(" ").replace(/[:：]\s*$/, "").trim(),
+             values: cells.slice(first).flatMap(splitItems) };
+  });
+}
+
+function parseBlob(text, layout) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim() !== "");
+  if (!lines.length) return [];
+  const rows = layout === "across" ? parseAcross(lines) : parseDown(lines);
+  return rows
+    .filter(r => r.values.filter(hasDigit).length >= 3)
+    .filter(r => !isLevelColumn(r.values));
+}
+
+// ── 상태 · 화면 ────────────────────────────────────────────────────────────
+const state = SECTIONS.map(s => ({ ...s, raw:"", layout:"down", rows:[] }));
+
+function rebuild(sec) {
+  sec.rows = parseBlob(sec.raw, sec.layout).map(p => ({
+    name: p.name, values: p.values, use: !NOT_A_HIT.test(p.name),
+  }));
+}
+
+function build() {
+  $("#element").append(...opts(ELEMENTS));
+  $("#weapon").append(...opts(WEAPONS));
+  $("#ascension").append(...opts(ASCENSION));
+
+  state.forEach((sec, i) => {
+    const ta = el("textarea", { rows:5, placeholder:"여기에 표를 붙여넣으세요" });
+    ta.addEventListener("input", () => { sec.raw = ta.value; rebuild(sec); render(); });
+
+    const sel = el("select", {}, opts([["down","레벨이 세로 (한 줄 = 레벨 하나)"],
+                                       ["across","레벨이 가로 (한 줄 = 항목 하나)"]], "down"));
+    sel.addEventListener("change", () => { sec.layout = sel.value; rebuild(sec); render(); });
+
+    $("#sections").append(el("div", {}, [
+      el("h3", { textContent:sec.key }),
+      ...(sec.hint ? [el("p", { className:"hint", textContent:sec.hint, style:"margin:0 0 6px" })] : []),
+      ta,
+      el("div", { className:"toolbar" }, [
+        el("label", {}, [el("span", { textContent:"레벨 축" }), sel]),
+        el("span", { className:"hint", id:"cnt"+i, style:"margin:0" }),
+      ]),
+      el("div", { id:"rows"+i }),
+    ]));
+  });
+
+  DESC_FIELDS.forEach(f => {
+    const box = el("div", { style:"margin-bottom:12px" });
+    box.append(el("label", { textContent:f.label }));
+    if (f.named) box.append(el("input", { id:f.id+"Name", placeholder:f.named, style:"margin-bottom:5px" }));
+    box.append(el("textarea", { id:f.id, rows:f.rows, placeholder:f.ph || "" }));
+    $("#desc").append(box);
+  });
+
+  document.addEventListener("input", render);
+  document.addEventListener("change", render);
+
+  $("#copy").addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText($("#out").value); }
+    catch { $("#outBox").open = true; $("#out").select(); document.execCommand("copy"); }
+    const b = $("#copy"); b.textContent = "복사했습니다";
+    setTimeout(() => b.textContent = "자료 복사", 1300);
+  });
+  $("#download").addEventListener("click", () => {
+    const a = el("a", { download:(val("enName") || "character") + ".txt",
+      href:URL.createObjectURL(new Blob([$("#out").value], { type:"text/plain" })) });
+    document.body.append(a); a.click(); a.remove();
+  });
+}
+
+function renderRows(sec, i) {
+  const host = document.getElementById("rows" + i);
+  host.textContent = "";
+  const n = sec.rows.length;
+  document.getElementById("cnt" + i).textContent =
+    n ? `${n}개 항목 · L1~L${sec.rows[0].values.length}` : "";
+  if (!n) return;
+
+  const head = el("tr", {}, ["쓸까", "항목 이름", "값"].map(t => el("th", { textContent:t })));
+  const body = sec.rows.map(r => {
+    const use = el("input", { type:"checkbox", checked:r.use, style:"width:auto" });
+    use.addEventListener("change", () => { r.use = use.checked; render(); });
+    const nm = el("input", { value:r.name, placeholder:"이름을 못 읽었습니다 — 적어 주세요" });
+    nm.addEventListener("input", () => { r.name = nm.value; render(); });
+    return el("tr", { className: r.use ? "" : "row-off" }, [
+      el("td", {}, [use]), el("td", {}, [nm]),
+      el("td", { className:"vals" }, [el("span", { textContent:r.values.join(" / ") })]),
+    ]);
+  });
+  host.append(el("table", { className:"rows" }, [el("thead", {}, [head]), el("tbody", {}, body)]));
+}
+
+// ── 넘길 자료 만들기 ───────────────────────────────────────────────────────
+const val  = id => ($("#"+id)?.value ?? "").trim();
+const pick = (pairs, v) => (pairs.find(p => p[0] === v) || ["",""])[1];
+// 한글은 폭이 2라 padEnd로는 안 맞는다. 자리만 대충 맞춰 읽기 좋게 한다.
+const wide = t => [...t].reduce((n, c) => n + (c.charCodeAt(0) > 0x2000 ? 2 : 1), 0);
+const pad  = (t, w) => t + " ".repeat(Math.max(0, w - wide(t)));
+
+function buildDoc() {
+  const bad = [], warn = [], L = [];
+
+  if (!val("krName")) bad.push("한글 이름이 비었습니다.");
+  if (!val("enName")) bad.push("영문 이름이 비었습니다.");
+  if (!val("ascension")) bad.push("돌파 보너스 스탯을 고르지 않았습니다 — 빠지면 계산에서 보너스가 0이 됩니다.");
+
+  L.push(`# ${val("krName") || "(이름 없음)"} (${val("enName") || "?"})`);
+  L.push(`원소: ${pick(ELEMENTS, val("element"))} · 무기: ${pick(WEAPONS, val("weapon"))} · `
+       + `${val("rarity")}성 · 돌파 보너스: ${pick(ASCENSION, val("ascension")) || "(미선택)"}`);
+  const cons = [["cNa","일반 공격"],["cSkill","원소 스킬"],["cBurst","원소 폭발"]]
+    .filter(([id]) => val(id)).map(([id, t]) => `${t} C${val(id)}`);
+  L.push(`특성 레벨 +3 명함: ${cons.length ? cons.join(" / ") : "(모름 — 명함 원문에서 읽어 주세요)"}`);
+
+  state.forEach(sec => {
+    const rows = sec.rows.filter(r => r.use);
+    if (!rows.length) return;
+    const lens = new Set(rows.map(r => r.values.length));
+    if (lens.size > 1) {
+      warn.push(`[${sec.key}] 항목마다 레벨 수가 다릅니다 (${[...lens].sort((a,b)=>a-b).join(", ")}) — 표가 어긋났을 수 있습니다.`);
+    }
+    if (rows.some(r => !r.name)) {
+      warn.push(`[${sec.key}] 이름이 비어 있는 항목이 있습니다 — 무엇의 계수인지 적어 주세요.`);
+    }
+    L.push("", `## ${sec.key}  (L1~L${rows[0].values.length})`);
+    const w = Math.max(...rows.map(r => wide(r.name)));
+    rows.forEach(r => L.push(`${pad(r.name, w)} : ${r.values.join(" / ")}`));
+  });
+
+  const desc = [];
+  for (const f of DESC_FIELDS) {
+    const body = val(f.id), nm = f.named ? val(f.id + "Name") : "";
+    if (!body && !nm) continue;
+    // 「E : 전광석화」 다음 줄에 본문 — 게임 문구와 코드 docstring이 쓰는 꼴 그대로.
+    desc.push(f.head ? `${f.head} :${nm ? " " + nm : ""}${body ? "\n" + body : ""}` : body);
+  }
+  if (!desc.length) warn.push("특성 설명이 비었습니다 — 원문이 없으면 효과를 구현할 수 없습니다.");
+
+  // 명함 번호를 적었으면 그 명함 원문이 레벨 상승을 말해야 한다 — C3/C5를 바꿔 적는 사고.
+  for (const [id, label, word] of [["cNa", "일반 공격", "일반"],
+                                   ["cSkill", "원소 스킬", "스킬"],
+                                   ["cBurst", "원소 폭발", "폭발"]]) {
+    const n = val(id);
+    if (!n) continue;
+    const block = val("dC" + n + "Name") + " " + val("dC" + n);
+    if (!block.trim()) {
+      warn.push(`${label} 레벨 +3을 C${n}으로 적었는데 C${n} 원문이 비었습니다.`);
+    } else if (!block.includes(word) || !block.includes("레벨")) {
+      warn.push(`${label} 레벨 +3을 C${n}으로 적었는데 C${n} 원문이 「${word} … 레벨」 상승을 `
+              + `말하지 않습니다 — 번호를 바꿔 적었을 수 있습니다.`);
+    }
+  }
+  if (desc.length) L.push("", "## 특성 설명", desc.join("\n\n"));
+
+  if (val("extra")) L.push("", "## 그 밖의 수치", val("extra"));
+  if (val("notes")) L.push("", "## 판단 메모", val("notes"));
+
+  if (!state.some(s => s.rows.length)) bad.push("계수 표가 하나도 없습니다.");
+  return { text:L.join("\n") + "\n", bad, warn };
+}
+
+function render() {
+  state.forEach(renderRows);
+  const { text, bad, warn } = buildDoc();
+  $("#out").value = text;
+
+  const msgs = $("#msgs");
+  msgs.textContent = "";
+  [...new Set(bad)].forEach(m  => msgs.append(el("li", { className:"bad",  textContent:"채워야 함 · " + m })));
+  [...new Set(warn)].forEach(m => msgs.append(el("li", { className:"warn", textContent:"확인 · " + m })));
+  if (!bad.length && !warn.length) {
+    msgs.append(el("li", { className:"ok", textContent:"다 채워졌습니다. 복사해서 넘겨주세요." }));
+  }
+
+  const items = state.reduce((n, s) => n + s.rows.filter(r => r.use).length, 0);
+  const dock = $("#dockStat");
+  dock.textContent = bad.length ? `채울 것 ${bad.length}건`
+    : warn.length  ? `${items}개 항목 · 확인 ${warn.length}건`
+    : `${items}개 항목`;
+  dock.style.color = bad.length ? "var(--bad)" : warn.length ? "var(--warn)" : "var(--dim)";
+}
+
+build();
+render();
+</script>
+</body>
+</html>

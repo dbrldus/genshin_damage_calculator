@@ -4,8 +4,9 @@
 실제로 거쳐 온 순서를 그대로 옮긴 것이다. 새 무기를 넣을 때는 이 순서대로 진행한다.
 
 캐릭터 쪽과 겹치는 규칙(Phase 정의, 지연 기여, 자기 참조 순환)은
-[`docs/character-implementation.md`](character-implementation.md)에 있다. 여기서는 **무기라서
-다른 것**만 적는다. 무기가 캐릭터와 다른 점은 셋이다.
+[`docs/character-implementation.md`](character-implementation.md)에 있다. 캐릭터도 같은 꼴의
+스펙 파일과 생성기(`tools/new_character.py`)를 쓴다 — 절차의 모양이 둘이 같다. 여기서는
+**무기라서 다른 것**만 적는다. 무기가 캐릭터와 다른 점은 셋이다.
 
 - 기본 공격력·부옵션을 **선언하지 않는다.** 성급·티어·레벨에서 유도된다.
 - 훅이 셋이다 — `add_hits`(Phase 1), `apply_passive`(Phase 3), `apply_passive_dependent`(Phase 5).
