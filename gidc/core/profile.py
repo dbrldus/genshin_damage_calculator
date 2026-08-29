@@ -306,6 +306,24 @@ class SkillHit:
     def_reduction:        float = 0.0
     def_ignore:           float = 0.0
     elevation_multiplier: float = 1.0
+
+    # 달·별 반응 **계열별** 승격. elevation_multiplier가 「달빛 반응 전부」를 올리는 자리라면
+    # (콜롬비나 명함 「달빛 반응 피해 승격」) 이쪽은 한 반응만 올리는 자리다
+    # (린네아 C6 보름 — 달 결정 반응만 25% 승격).
+    #
+    # 나눠 두지 않으면 둘을 함께 편성했을 때 린네아의 달결정 전용 승격이 콜롬비나의
+    # 달감전·달개화에도 곱해진다. {접두}_bonus·{접두}_base_dmg_bonus가 이미 반응별로
+    # 나뉜 것과 같은 규약이며, 이름을 손으로 적는 자리를 만들지 않으려고 접두사 표에서
+    # 유도한다(celestial_elevation_field).
+    #
+    # 읽는 자리는 elevation_multiplier와 **같은 곳**이고 값을 더해 쓴다(_celestial_elevation).
+    # 기본값이 0.0이라 아무도 넣지 않으면 기존 계산과 완전히 같다 — 계열 공통 몫이 1.0에서
+    # 시작하는 것과 달리 이쪽은 가산분이다.
+    lunar_charged_elevation:     float = 0.0
+    lunar_bloom_elevation:       float = 0.0
+    lunar_crystallize_elevation: float = 0.0
+    stellar_conduct_elevation:   float = 0.0
+    stellar_swirl_elevation:     float = 0.0
     #endregion
 
     # ── 적 원소별 내성 감소 효과 ───────────────────────────────────────────────────────
@@ -719,6 +737,26 @@ def _celestial_base_dmg_bonus(hit: SkillHit, reaction_type: ReactionType) -> flo
     return getattr(hit, field) if field else 0.0
 
 
+def celestial_elevation_field(reaction_type: ReactionType) -> str | None:
+    """달·별 반응의 **계열별 승격** 필드 이름. celestial_base_dmg_bonus_field와 같은 규약이다.
+
+    달·별이 아닌 반응은 None이다 — 그쪽 _calc_*는 승격 자체를 읽지 않는다.
+    """
+    if reaction_type not in _CELESTIAL_REACTIONS:
+        return None
+    return f"{_REACTION_PREFIX[reaction_type]}_elevation"
+
+
+def _celestial_elevation(hit: SkillHit, reaction_type: ReactionType) -> float:
+    """공식의 Elevation 자리. 계열 공통 몫(elevation_multiplier)에 그 반응 전용 몫을 더한다.
+
+    공통 몫이 1.0에서 시작하고 전용 몫이 0.0에서 시작하므로, 아무도 전용 필드를 쓰지
+    않으면 값은 elevation_multiplier 그대로다.
+    """
+    field = celestial_elevation_field(reaction_type)
+    return hit.elevation_multiplier + (getattr(hit, field) if field else 0.0)
+
+
 def element_res_reduction_field(element: Element) -> str:
     return f"{_ELEMENT_PREFIX.get(element, 'physical')}_res_reduction"
 
@@ -1001,7 +1039,7 @@ def build_damage_context(
         reaction_bonus           = _reaction_bonus(hit, reaction_type),
         # 달·별 공용 슬롯 — 그 반응 전용 필드를 골라 담는다(_celestial_base_dmg_bonus).
         celestial_base_dmg_bonus = _celestial_base_dmg_bonus(hit, reaction_type),
-        elevation_multiplier     = hit.elevation_multiplier,
+        elevation_multiplier     = _celestial_elevation(hit, reaction_type),
         reaction_crit_rate       = _reaction_crit_rate(hit, reaction_type),
         reaction_crit_dmg        = _reaction_crit_dmg(hit, reaction_type),
     )
@@ -1094,7 +1132,7 @@ def build_lunar_reaction_context(
 
         # 달·별 공용 슬롯에 이 반응 전용 필드를 담는다 — 별 반응 빌더와 같은 규약.
         celestial_base_dmg_bonus = _celestial_base_dmg_bonus(hit, reaction),
-        elevation_multiplier     = hit.elevation_multiplier,
+        elevation_multiplier     = _celestial_elevation(hit, reaction),
 
         # 달반응은 캐릭터 치명타를 쓴다 — 격변과 갈리는 자리다.
         crit_rate = hit.crit_rate,
@@ -1137,6 +1175,12 @@ def lunar_reaction_input_fields(
     # 「달빛 반응의 치명타 피해」 전용 몫 — 반응별 필드라 여기서도 반응으로 골라야
     # 달감전만 올리는 버프가 달개화 설명에 적용됨으로 뜨지 않는다.
     fields |= _celestial_crit_fields(reaction)
+
+    # 계열별 승격도 그 반응 전용 필드 하나다 — 위 elevation_multiplier(계열 공통)와 더해
+    # 쓰이므로 둘 다 화면에 걸려야 한다(_celestial_elevation).
+    elevation = celestial_elevation_field(reaction)
+    if elevation:
+        fields.add(elevation)
 
     # 기초 피해 증가는 그 반응 전용 필드 하나다 — 이름을 손으로 적으면 「달감전만」 올리는
     # 버프(이네파 Moonsign)가 달개화 설명에 적용됨으로 뜬다.
@@ -1188,7 +1232,7 @@ def build_stellar_reaction_context(
 
         # 달·별 공용 슬롯에 이 반응 전용 필드를 담는다 — 달반응 빌더와 같은 규약.
         celestial_base_dmg_bonus = _celestial_base_dmg_bonus(hit, reaction),
-        elevation_multiplier     = hit.elevation_multiplier,
+        elevation_multiplier     = _celestial_elevation(hit, reaction),
 
         # 별 반응도 캐릭터 치명타를 쓴다. 반응 전용 몫은 달반응과 같은 규약으로 전용 슬롯에
         # 담아 넘긴다 — 아직 별 반응 전용 치명타를 주는 장비는 없어 값은 0이지만, 생기는 날
@@ -1226,6 +1270,11 @@ def stellar_reaction_input_fields(
 
     # 반응 전용 치명타 — 달반응 쪽과 같은 규칙이다(_celestial_crit_fields).
     fields |= _celestial_crit_fields(reaction)
+
+    # 계열별 승격 — 달반응 쪽과 같은 규칙이다(_celestial_elevation).
+    elevation = celestial_elevation_field(reaction)
+    if elevation:
+        fields.add(elevation)
 
     base = celestial_base_dmg_bonus_field(reaction)
     if base:
@@ -1350,6 +1399,11 @@ def damage_input_fields(
 
     if dmg_type in _CELESTIAL_DMG_TYPE_SET:
         fields.add("elevation_multiplier")
+        # 계열별 승격은 그 반응 전용 필드 하나만 — 계열 공통 몫과 더해 쓰인다
+        # (_celestial_elevation). 여럿 넣으면 안 곱해지는 항목이 '적용됨'으로 뜬다.
+        elevation = celestial_elevation_field(reaction_type)
+        if elevation:
+            fields.add(elevation)
         # 기초 피해 증가는 그 반응 전용 필드 하나만 — build_damage_context가 담는 것과 같다
         # (_celestial_base_dmg_bonus). 여럿 넣으면 안 곱해지는 항목이 '적용됨'으로 뜬다.
         base = celestial_base_dmg_bonus_field(reaction_type)
