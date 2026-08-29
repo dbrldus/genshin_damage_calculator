@@ -50,7 +50,7 @@ class Ineffa(Character):
     """
     name = "이네파"
     weapon_type = WeaponType.POLEARM
-    # 놋 크라이 출신 — 파티 달빛 징조에 기여한다.
+    # 노드크라이 출신 — 파티 달빛 징조에 기여한다.
     # Moonsign 문구대로 파티 내 감전 반응이 달감전으로 전환된다 — 달결정은 전환하지 않는다.
     innate_traits = frozenset({
         CharacterTrait.MOONSIGN,

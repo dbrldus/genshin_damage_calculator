@@ -64,7 +64,12 @@ def skill_level_bonus(members) -> int:
 
 
 def moonsign_level(members) -> MoonsignLevel:
-    """파티의 달빛 징조 레벨."""
+    """파티의 달빛 징조 레벨.
+
+    노드크라이 캐릭터의 「…가 파티에 있을 경우 파티의 달빛 징조가 1레벨 상승한다」는 곧
+    이 인원수 판정 자체다 — 임계값 표가 이미 「1명이면 초승, 2명이면 보름」으로 그 상승을
+    표현하고 있다. 그 문구를 별도 특성으로 한 번 더 세면 같은 효과를 두 번 세는 것이 된다.
+    """
     count = count_trait(members, CharacterTrait.MOONSIGN)
     for threshold, level in _MOONSIGN_THRESHOLDS:
         if count >= threshold:

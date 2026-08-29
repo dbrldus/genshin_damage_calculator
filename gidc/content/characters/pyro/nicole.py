@@ -2,6 +2,7 @@ from gidc.core.character import Character, clamp_talent_index
 from gidc.core.profile import SkillHit, SkillType, ScalingStat
 from gidc.enums import CharacterTrait, Element
 from gidc.core.party_state import hexerei_rite_for
+from gidc.enums import StatType
 from gidc.enums import WeaponType
 from gidc.prompt import ask_bool
 
@@ -97,6 +98,7 @@ class Nicole(Character):
     BURST_TABLES = (_BURST_DMG, _BURST_ARCANE_PROJECTION,)
 
     rarity = 5
+    ascension_stat = StatType.ATK_PCT
 
     @property
     def element(self)  -> Element: return Element.PYRO

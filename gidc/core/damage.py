@@ -59,7 +59,12 @@ class DamageContext:
     # 웹의 공식 트레이스 라벨은 "1+lunar_base" 그대로다 — 이 필드 이름과 묶여 있지 않은
     # 별개의 문자열이고(web_api._FORMULA_LABELS의 키), 바꾸면 저장된 화면 순서가 흔들린다.
     celestial_base_dmg_bonus: float = 0.0
-    # Elevation Multiplier
+    # Elevation Multiplier — 공식: × 이 값
+    #
+    # 위 celestial_base_dmg_bonus와 같은 **공용 슬롯**이다. SkillHit 쪽은 반응마다 승격
+    # 필드가 따로 있고(lunar_charged/…/stellar_swirl_elevation) 값도 가산분(0.0 시작)이지만,
+    # 공식에 들어가는 자리는 하나이고 곱해지는 것은 1을 더한 배율이다. 어느 필드를 담아
+    # 어떻게 접을지는 profile._celestial_elevation이 안다.
     elevation_multiplier: float = 1.0
 
     # ── 반응 고유 치명타 (Transformative / Lunar Reaction) ──────────────

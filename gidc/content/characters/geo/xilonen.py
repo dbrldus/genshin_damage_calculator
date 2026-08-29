@@ -1,4 +1,5 @@
 from gidc.core.character import Character, clamp_talent_index
+from gidc.enums import StatType
 from gidc.enums import WeaponType
 from gidc.core.profile import SkillHit, SkillType, ScalingStat
 from gidc.enums import Element
@@ -111,6 +112,7 @@ class Xilonen(Character):
     BURST_TABLES = (_BURST_DMG, _FOLLOW_UP_BEAT_DMG, _BURST_HEAL_DEF, _BURST_HEAL_FLAT,)
 
     rarity = 5
+    ascension_stat = StatType.DEF_PCT
 
     @property
     def element(self)  -> Element: return Element.GEO
