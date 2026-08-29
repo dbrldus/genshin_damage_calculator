@@ -24,6 +24,7 @@ CHARACTER_REGISTRY: dict[str, type[Character]] = {
     "나비아":  geo.Navia,
     "피슬":    electro.Fischl,
     "린네아":    geo.Linnea,
+    "자백":    geo.Zibai,
 }
 
 
