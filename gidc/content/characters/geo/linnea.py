@@ -76,12 +76,12 @@ class Linnea(Character):
     """
     name = "린네아"
     weapon_type = WeaponType.BOW
-    # 놋 크라이 출신 — 파티 달빛 징조에 기여하고, 「서식지 조사」로 그 레벨을 한 칸 더 올린다.
-    # 그래서 린네아가 들어간 파티의 달빛 징조는 혼자여도 보름이다(party_state.moonsign_level).
+    # 놋 크라이 출신 — 파티 달빛 징조에 기여한다.
+    # 「서식지 조사」의 "파티의 달빛 징조가 1레벨 상승"은 이 특성이 곧 그 상승이다 —
+    # party_state의 인원수 임계값 표가 이미 그렇게 세고 있다(이네파도 같은 문구다).
     # 파티에 있으면 물 원소 결정 → 달결정으로 전환된다(core.reaction.lunar_candidates).
     innate_traits = frozenset({
         CharacterTrait.MOONSIGN,
-        CharacterTrait.MOONSIGN_ELEVATION,
         CharacterTrait.LUNAR_CRYSTALLIZE_CONVERTER,
     })
 
@@ -274,8 +274,8 @@ class Linnea(Character):
 
         # ── A1 야외 관찰 일지 : 루미 주변 적의 바위 원소 내성 감소 ────────────────
         # 적에게 걸리는 효과라 파티 전원의 바위 히트가 함께 받는다.
-        # 보름이면 한 번 더 깎인다 — 린네아가 파티에 있으면 달빛 징조는 항상 보름이지만
-        # (「서식지 조사」의 +1레벨), 판정은 party_state에서 유도해 한 자리만 읽는다.
+        # 보름이면 한 번 더 깎인다 — 린네아 혼자면 초승이므로 놋 크라이 캐릭터가 한 명 더
+        # 있어야 붙는다. 판정은 묻지 않고 party_state에서 유도한다.
         if self._lumi_on_field:
             reduction = self._A1_GEO_RES_REDUCTION
             if full_moon:

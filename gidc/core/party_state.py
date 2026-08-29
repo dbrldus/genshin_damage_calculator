@@ -17,11 +17,6 @@ _MOONSIGN_THRESHOLDS = [
     (1, MoonsignLevel.CRESCENT),  # 1명      → 초승
 ]
 
-# 레벨 사다리 — 「달빛 징조 상승」 보유자가 이 순서로 한 칸씩 올린다.
-# MoonsignLevel의 선언 순서를 그대로 믿지 않고 여기 다시 적는 이유는, 레벨이 늘어날 때
-# 「어느 쪽이 위인가」를 열거형 선언 순서에 맡기면 조용히 뒤집히기 때문이다.
-_MOONSIGN_LADDER = (MoonsignLevel.NONE, MoonsignLevel.CRESCENT, MoonsignLevel.FULL)
-
 
 def count_trait(members, trait: CharacterTrait) -> int:
     """해당 특성을 보유한 파티원 수."""
@@ -71,17 +66,12 @@ def skill_level_bonus(members) -> int:
 def moonsign_level(members) -> MoonsignLevel:
     """파티의 달빛 징조 레벨.
 
-    인원수로 기본 레벨을 정한 뒤, 「달빛 징조 상승」 보유자 수만큼 사다리를 올린다
-    (린네아 「서식지 조사」 — "린네아가 파티에 있을 경우 파티의 달빛 징조가 1레벨 상승한다").
-
-    달빛 징조 캐릭터가 하나도 없으면 없음에 머문다. 상승 특성 보유자는 달빛 징조 캐릭터
-    이기도 해서 실제로는 닿지 않는 자리지만, 「없음 + 상승 = 초승」이 되는 사고를 막아 둔다.
+    놋 크라이 캐릭터의 「…가 파티에 있을 경우 파티의 달빛 징조가 1레벨 상승한다」는 곧
+    이 인원수 판정 자체다 — 임계값 표가 이미 「1명이면 초승, 2명이면 보름」으로 그 상승을
+    표현하고 있다. 그 문구를 별도 특성으로 한 번 더 세면 같은 효과를 두 번 세는 것이 된다.
     """
     count = count_trait(members, CharacterTrait.MOONSIGN)
-    if not count:
-        return MoonsignLevel.NONE
-
-    level = next(lv for threshold, lv in _MOONSIGN_THRESHOLDS if count >= threshold)
-    index = (_MOONSIGN_LADDER.index(level)
-             + count_trait(members, CharacterTrait.MOONSIGN_ELEVATION))
-    return _MOONSIGN_LADDER[min(index, len(_MOONSIGN_LADDER) - 1)]
+    for threshold, level in _MOONSIGN_THRESHOLDS:
+        if count >= threshold:
+            return level
+    return MoonsignLevel.NONE
