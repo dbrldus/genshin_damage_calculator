@@ -76,7 +76,7 @@ class Linnea(Character):
     """
     name = "린네아"
     weapon_type = WeaponType.BOW
-    # 놋 크라이 출신 — 파티 달빛 징조에 기여한다.
+    # 노드크라이 출신 — 파티 달빛 징조에 기여한다.
     # 「서식지 조사」의 "파티의 달빛 징조가 1레벨 상승"은 이 특성이 곧 그 상승이다 —
     # party_state의 인원수 임계값 표가 이미 그렇게 세고 있다(이네파도 같은 문구다).
     # 파티에 있으면 물 원소 결정 → 달결정으로 전환된다(core.reaction.lunar_candidates).

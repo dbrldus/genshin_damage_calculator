@@ -83,7 +83,7 @@ class Zibai(Character):
     """
     name = "자백"
     weapon_type = WeaponType.SWORD
-    # 놋 크라이 출신 — 파티 달빛 징조에 기여한다.
+    # 노드크라이 출신 — 파티 달빛 징조에 기여한다.
     # 「빛의 흐름」의 "파티의 달빛 징조가 1레벨 상승"은 이 특성이 곧 그 상승이다 —
     # party_state의 인원수 임계값 표가 이미 그렇게 센다(린네아·이네파도 같은 문구다).
     # 파티에 있으면 물 원소 결정 → 달결정으로 전환된다(core.reaction.lunar_candidates).

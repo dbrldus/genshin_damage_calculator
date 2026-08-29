@@ -96,7 +96,7 @@ class Columbina(Character):
     
     name = "콜롬비나"
     weapon_type = WeaponType.CATALYST
-    # 놋 크라이 출신 — 파티 달빛 징조에 기여한다.
+    # 노드크라이 출신 — 파티 달빛 징조에 기여한다.
     # 파티에 있으면 감전 → 달감전, 결정 → 달결정으로 전환된다(core.reaction.lunar_candidates).
     innate_traits = frozenset({
         CharacterTrait.MOONSIGN,
