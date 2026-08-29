@@ -326,6 +326,10 @@ class SkillHit:
 
     # ── 적 원소별 내성 감소 효과 ───────────────────────────────────────────────────────
     #region
+    # **음수를 담는다.** 이 값은 적의 내성에 그대로 **더해진다**(_enemy_resistance) —
+    # 「내성 20% 감소」는 -0.20이다. 이름이 `reduction`이라 양수를 넣기 쉬운 자리이고,
+    # 양수를 넣으면 내성이 오히려 올라 피해가 줄지만 예외도 경고도 나지 않는다.
+    # 실제로 린네아 A1이 그렇게 들어갔다가 뒤늦게 잡혔다.
     pyro_res_reduction:     float = 0.0
     hydro_res_reduction:    float = 0.0
     cryo_res_reduction:     float = 0.0
@@ -823,7 +827,7 @@ _REACTION_MULT_CONST: dict[ReactionType, float] = {
 _LUNAR_MULT: dict[ReactionType, dict[DmgType, float]] = {
     ReactionType.LUNAR_CHARGED:     {DmgType.LUNAR_DIRECT: 3.0, DmgType.LUNAR_REACTION: 1.8},
     ReactionType.LUNAR_BLOOM:       {DmgType.LUNAR_DIRECT: 1.0, DmgType.LUNAR_REACTION: 0.0},
-    ReactionType.LUNAR_CRYSTALLIZE: {DmgType.LUNAR_DIRECT: 1.8, DmgType.LUNAR_REACTION: 0.96},
+    ReactionType.LUNAR_CRYSTALLIZE: {DmgType.LUNAR_DIRECT: 1.6, DmgType.LUNAR_REACTION: 0.96},
 }
 
 # 달반응 3종 — dmg_type이 두 자리(LUNAR_DIRECT/LUNAR_REACTION) 모두 유효한 유일한 반응.

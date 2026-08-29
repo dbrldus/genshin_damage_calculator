@@ -282,7 +282,9 @@ class Linnea(Character):
                 reduction += self._A1_FULLMOON_GEO_RES_REDUCTION
             for char_hits in all_hits.values():
                 for hit in char_hits.values():
-                    hit.add("geo_res_reduction", reduction, self, note="A1 야외 관찰 일지")
+                    # **음수**로 넣는다 — 이 필드는 적 내성에 그대로 더해진다
+                    # (profile._enemy_resistance). 양수를 넣으면 내성이 오히려 오른다.
+                    hit.add("geo_res_reduction", -reduction, self, note="A1 야외 관찰 일지")
 
         # ── C2 희비의 예언 : 화음 후 파티 내 물·바위 캐릭터의 치명타 피해 +40% ─────
         if c >= 2 and self._chorus:
