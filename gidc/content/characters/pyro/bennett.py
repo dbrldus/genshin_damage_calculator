@@ -1,6 +1,7 @@
 from gidc.core.character import Character, clamp_talent_index
 from gidc.core.profile import SkillHit, SkillType, ScalingStat
 from gidc.enums import Element
+from gidc.enums import StatType
 from gidc.enums import WeaponType
 from gidc.prompt import ask_bool, ask_choice
 
@@ -67,6 +68,7 @@ class Bennett(Character):
     BURST_TABLES = (_BURST_DMG, _BURST_ATK_RATIO,)
 
     rarity = 4
+    ascension_stat = StatType.ENERGY_RECHARGE
 
     @property
     def element(self)  -> Element: return Element.PYRO

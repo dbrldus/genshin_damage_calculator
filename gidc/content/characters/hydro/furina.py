@@ -1,4 +1,5 @@
 from gidc.core.character import Character, clamp_talent_index
+from gidc.enums import StatType
 from gidc.enums import WeaponType
 from gidc.core.profile import SkillHit, SkillType, ScalingStat
 from gidc.enums import Element
@@ -117,6 +118,7 @@ class Furina(Character):
     BURST_TABLES = (_BURST_DMG, _FANFARE_DMG_INCREASE,)
 
     rarity = 5
+    ascension_stat = StatType.CRIT_RATE
 
     @property
     def element(self)  -> Element: return Element.HYDRO
