@@ -156,6 +156,7 @@ class Sandrone(Character):
     # C1 : 파티 전원의 **별빛 반응**(별 초전도·별 확산) 피해 +30%
     _C1_STELLAR_DMG    = 0.30
     _STELLAR_BONUS_FIELDS = ("stellar_conduct_bonus", "stellar_swirl_bonus")
+    _STELLAR_ELEVATION_FIELDS = ("stellar_conduct_elevation", "stellar_swirl_elevation")
     # C2 : 냉각 광선 치명타 피해 +40%, 발사마다 추가 +20% (최대 3스택)
     _C2_COOLANT_CRIT_DMG           = 0.40
     _C2_COOLANT_CRIT_DMG_PER_STACK = 0.20
@@ -170,7 +171,7 @@ class Sandrone(Character):
         ReactionType.STELLAR_SWIRL:   1.20,
     }
     _C6_FOCUSED_RAY_HITS   = 4
-    # C6 : 산드로네가 주는 모든 별빛 반응 피해 20% '승격' → elevation_multiplier
+    # C6 : 산드로네가 주는 모든 별빛 반응 피해 20% '승격' → stellar_*_elevation
     _C6_STELLAR_ELEVATION = 0.20
     #endregion
 
@@ -366,14 +367,18 @@ class Sandrone(Character):
                         hit.add(field, self._C1_STELLAR_DMG, self, note="C1")
 
         # C6 승격: 「산드로네가 주는 모든 별빛 반응 피해」 — 자기 히트 전부에 건다.
-        # 전 히트에 거는 것이 맞다. elevation_multiplier는 달·별 계열 피해에서만 읽히므로
+        # 전 히트에 거는 것이 맞다. 승격 필드는 달·별 계열 피해에서만 읽히므로
         # (damage._calc_lunar_*) 평타 같은 히트에 붙어도 숫자에 들어가지 않고, 반대로 파티
         # 별 확산 **반응 피해**는 캐리어 히트(그 캐릭터의 첫 히트)에서 이 필드를 읽는다 —
         # 산드로네는 얼음이라 별 확산 참여자 후보이고, 그 몫도 「그가 주는 별빛 반응 피해」다.
         # 그가 참여할 수 있는 달반응은 없다(달감전은 물·번개, 달결정은 바위·물).
+        #
+        # 「모든 별빛 반응」이라 두 계열 모두에 넣는다 — 승격 필드가 반응별로 나뉘어 있어
+        # C1이 stellar_*_bonus를 둘에 넣는 것과 같은 모양이 된다.
         if c >= 6:
             for hit in hits.values():
-                hit.add("elevation_multiplier", self._C6_STELLAR_ELEVATION, self, note="C6 승격")
+                for field in self._STELLAR_ELEVATION_FIELDS:
+                    hit.add(field, self._C6_STELLAR_ELEVATION, self, note="C6 승격")
 
         # C2: 섬광 상태의 냉각 광선(= 그 계열로 전환된 쪽)의 치명타 피해.
         # 기본 40%는 스택과 무관하게 붙고, 스택은 그 위에 20%씩 얹힌다.

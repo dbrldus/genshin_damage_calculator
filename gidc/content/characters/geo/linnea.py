@@ -301,8 +301,8 @@ class Linnea(Character):
                 megaton.add("crit_dmg", self._C2_MEGATON_CRIT_DMG, self, note="C2 메가톤")
 
         # ── C6 보름 : 파티가 주는 달 결정 반응 피해 25% 승격 ─────────────────────
-        # 계열 공통 슬롯(elevation_multiplier)이 아니라 달결정 전용 슬롯에 넣는다 —
-        # 공통 슬롯에 넣으면 콜롬비나와 함께 편성했을 때 달감전·달개화까지 같이 올라간다.
+        # 승격 필드는 반응별로 나뉘어 있다 — 달결정 전용 자리에만 넣으므로 콜롬비나와 함께
+        # 편성해도 달감전·달개화로 새지 않는다(profile.celestial_elevation_field).
         # 파티 달결정 **반응 피해**는 참여자의 첫 히트를 캐리어로 읽으므로 전원에게 건다.
         if c >= 6 and full_moon:
             for char_hits in all_hits.values():

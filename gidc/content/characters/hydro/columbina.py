@@ -172,7 +172,7 @@ class Columbina(Character):
     ]
 
     # ── 명함 「달빛 반응 피해 승격」 ─────────────────────────────────────────
-    # 원문이 Q의 '증가'와 구분해 '승격'이라 부르는 계열 → elevation_multiplier 에 가산한다.
+    # 원문이 Q의 '증가'와 구분해 '승격'이라 부르는 계열 → lunar_*_elevation 에 가산한다.
     # 명함은 누적되므로 보유한 단계의 값을 모두 더한다 (C6 기준 합계 20%).
     _CONSTELLATION_ELEVATION = {1: 0.015, 2: 0.07, 3: 0.015, 4: 0.015, 5: 0.015, 6: 0.07}
 
@@ -382,13 +382,20 @@ class Columbina(Character):
                     hit.add("lunar_bloom_bonus",       bonus, self, note="Q 향수에 잠긴 달")
                     hit.add("lunar_crystallize_bonus", bonus, self, note="Q 향수에 잠긴 달")
 
-        # 명함 「승격」: Q의 '증가'와 구분되는 계열 → elevation_multiplier.
+        # 명함 「승격」: Q의 '증가'와 구분되는 계열 → lunar_*_elevation.
         # 명함은 누적이므로 보유 단계의 값을 모두 더한다.
+        #
+        # 원문이 「달빛 반응 피해」라 3종 모두에 넣는다 — 승격 필드가 반응별로 나뉘어 있어
+        # 세 자리에 각각 적는다. Q 「향수에 잠긴 달」이 lunar_*_bonus를 셋에 넣는 것과 같다.
+        # 계열 공통 슬롯 하나에 넣는 길은 없다: 그 슬롯이 있으면 「달 결정만」 올리는 승격
+        # (린네아 C6)이 여기 달감전·달개화에까지 새기 때문에 두지 않았다.
         elevation = sum(v for lv, v in self._CONSTELLATION_ELEVATION.items() if c >= lv)
         if elevation:
             for char_hits in all_hits.values():
                 for hit in char_hits.values():
-                    hit.add("elevation_multiplier", elevation, self, note="명함 승격")
+                    hit.add("lunar_charged_elevation",     elevation, self, note="명함 승격")
+                    hit.add("lunar_bloom_elevation",       elevation, self, note="명함 승격")
+                    hit.add("lunar_crystallize_elevation", elevation, self, note="명함 승격")
 
         # C6: 반응에 참여한 원소 타입의 치명타 피해 +80% (해당 원소 히트에만).
         # 「같은 원소 타입끼리 비중첩」이나 파티에 콜롬비나는 1명뿐이라 중복 제출이 없다.

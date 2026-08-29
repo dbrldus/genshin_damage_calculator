@@ -72,8 +72,8 @@ _DECLARED_FIELDS = ["coeff", "coeff_amp"]
 _CRIT_REACTION_FIELDS = [
     # EM은 합계가 파생 프로퍼티라 원장이 없다 — 저장 조각 둘을 넣는다(profile._EM_LEDGER_FIELDS).
     "crit_rate", "crit_dmg", "em_from_flat", "em_from_pct_share", "energy_recharge",
-    "def_reduction", "def_ignore", "elevation_multiplier",
-    # 승격도 계열별 몫이 따로 있다 — 「달 결정만」 올리는 버프(린네아 C6 보름)가 달감전까지
+    "def_reduction", "def_ignore",
+    # 승격은 반응별로 나뉘어 있다 — 「달 결정만」 올리는 버프(린네아 C6 보름)가 달감전까지
     # 올리면 안 되기 때문이다(profile.celestial_elevation_field).
     "lunar_charged_elevation", "lunar_bloom_elevation", "lunar_crystallize_elevation",
     "stellar_conduct_elevation", "stellar_swirl_elevation",
